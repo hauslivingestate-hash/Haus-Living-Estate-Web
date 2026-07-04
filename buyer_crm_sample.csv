@@ -1,0 +1,4 @@
+lead_id,date_received,listing_code,potential,lead_status,pipeline_stage,bank_loan,interested,lead_type,sale_id,lead_name,phone,admin_remark,line_id,budget,progress,last_follow_date,activity_comment,commission,closing_date,transfer_date,case_closing_remark,complete,confirm
+LEAD-0001,2026-07-01,HS-00123,A,Active,Call,Process,,,,คุณสมชาย ใจดี,0812345678,ลูกค้าสนใจคอนโดใกล้ BTS,somchai.line,5000000,20,2026-07-03,โทรคุยแล้ว นัดดูห้อง 6 ก.ค.,150000,,,,FALSE,FALSE
+LEAD-0002,2026-07-02,HS-00088,B,Active,Show,Process,,,,คุณมาลี สวยงาม,0898765432,ต้องการบ้านเดี่ยว 3 ห้องนอน,malee.line,8500000,45,2026-07-04,ดูบ้านแล้ว 2 หลัง กำลังตัดสินใจ,255000,,,,FALSE,FALSE
+LEAD-0003,2026-06-28,HS-00201,A,Win,Win,Approved,,,,คุณวิชัย รุ่งเรือง,0851122334,ปิดการขายเรียบร้อย โอนแล้ว,wichai.line,3200000,100,2026-07-01,เซ็นสัญญาและโอนกรรมสิทธิ์เรียบร้อย,96000,2026-06-30,2026-07-01,ปิดเคสสมบูรณ์,TRUE,TRUE

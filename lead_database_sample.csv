@@ -1,0 +1,4 @@
+date_received,lead_type,listing_code,listing_name,lead_name,phone,line_id,gender,nationality,remark,sales_id,contact_date,contact_time,marketing_channel,marketing_channel_other,contact_by,line_userid,customer_complain,complain_status,complain_remark
+2026-07-01,Buyer - Buy,,The Base Sukhumvit,คุณสมชาย ใจดี,0812345678,somchai.line,Male,Thai,สนใจคอนโดใกล้ BTS งบไม่เกิน 5 ล้าน,,2026-07-02,14:30,Facebook Ad,,LINE OA,,,,
+2026-07-02,Owner - Sale,,บ้านเดี่ยว ลาดพร้าว 71,คุณมาลี สวยงาม,0898765432,malee.line,Female,Thai,ต้องการฝากขายบ้านเดี่ยว,,2026-07-02,10:15,Ddproperty,,Call,,,,
+2026-06-28,Buyer - Rent,,,Mr. John Smith,0851122334,john.smith,Male,Foreigner,หาเช่าคอนโด 3 เดือน,,2026-06-29,16:45,อื่นๆ,เพื่อนแนะนำมาจากกลุ่ม expat,Facebook Inbox,,ห้องที่นัดดูไม่ว่างตามที่แจ้ง,Open,ลูกค้าไม่พอใจ นัดดูใหม่แล้ว
