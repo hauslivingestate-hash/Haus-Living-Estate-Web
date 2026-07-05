@@ -1,8 +1,8 @@
 -- ============================================================
 -- HAUS LIVING ESTATE — FULL DATABASE SETUP (รันทีเดียวจบทั้งระบบ)
 -- วางทั้งไฟล์นี้ใน Supabase > SQL Editor แล้วกด Run
--- โมดูล: main_hr | main_lead_database | main_buyer_crm |
---        main_listing_database (+ owner/property_detail/last_match/photo)
+-- โมดูล: main_1_hr | main_5_lead_database | main_6_buyer_crm |
+--        main_4_listing_database (+ owner/main_3_property_detail/last_match/photo)
 -- FK เชื่อมครบในไฟล์เดียว
 -- ============================================================
 
@@ -10,16 +10,27 @@
 -- ============================================================
 -- 0) ล้างของเก่าทั้งหมด (setup ครั้งแรกเท่านั้น) ⚠️ ถ้ามีข้อมูลจริงแล้วอย่ารัน
 -- ============================================================
+drop view  if exists v_support_listing     cascade;
 drop view  if exists v_main_listing        cascade;
-drop table if exists main_listing_photo     cascade;
-drop table if exists main_last_match        cascade;
-drop table if exists main_buyer_crm         cascade;
-drop table if exists main_lead_database     cascade;
-drop table if exists main_listing_database  cascade;
-drop table if exists property_detail        cascade;
-drop table if exists main_owner             cascade;
-drop table if exists main_hr                cascade;
--- ชื่อเก่า เผื่อเคยรันไว้
+drop table if exists main_10_potential_listing cascade;
+drop table if exists main_9_support_log     cascade;
+drop table if exists main_8_listing_photo     cascade;
+drop table if exists main_7_last_match        cascade;
+drop table if exists main_6_buyer_crm         cascade;
+drop table if exists main_5_lead_database     cascade;
+drop table if exists main_4_listing_database  cascade;
+drop table if exists main_3_property_detail        cascade;
+drop table if exists main_2_owner             cascade;
+drop table if exists main_1_hr                cascade;
+-- ชื่อเก่า เผื่อเคยรันไว้ (ก่อนใส่เลขนำหน้า main_1_..main_10_)
+drop table if exists main_listing_photo    cascade;
+drop table if exists main_last_match       cascade;
+drop table if exists main_buyer_crm        cascade;
+drop table if exists main_lead_database    cascade;
+drop table if exists main_listing_database cascade;
+drop table if exists property_detail       cascade;
+drop table if exists main_owner            cascade;
+drop table if exists main_hr               cascade;
 drop table if exists buyer_crm cascade;
 drop table if exists leads cascade;
 drop table if exists lead_database cascade;
@@ -63,7 +74,7 @@ insert into gender (name) values ('Male'), ('Female'), ('Other'), ('N/A');
 create table nationality (name text primary key);
 insert into nationality (name) values ('Thai'), ('Foreigner');
 
--- ---- main_buyer_crm ----
+-- ---- main_6_buyer_crm ----
 create table potential (name text primary key);
 insert into potential (name) values ('A'), ('B'), ('C'), ('New Lead'), ('Agent');
 
@@ -78,7 +89,7 @@ create table bank_loan (name text primary key);
 insert into bank_loan (name) values
   ('Process'), ('Approved'), ('Rejected'), ('Blacklist (Credit Bureau)');
 
--- ---- main_lead_database ----
+-- ---- main_5_lead_database ----
 create table lead_type (name text primary key);
 insert into lead_type (name) values
   ('Owner - Sale'), ('Owner - Rent'), ('Owner - Others'),
@@ -97,7 +108,7 @@ insert into contact_by (name) values
   ('Call'), ('LINE OA'), ('Facebook Inbox'), ('Tiktok Inbox'),
   ('Ddproperty Inbox'), ('Livinginsider Inbox'), ('Email'), ('Personal');
 
--- ---- main_hr ----
+-- ---- main_1_hr ----
 create table employee_status (name text primary key);
 insert into employee_status (name) values ('Active'), ('Probation'), ('Warning'), ('Terminate');
 
@@ -107,7 +118,7 @@ insert into job_position (name) values ('CEO'), ('CTO'), ('CFO'), ('Listing Supp
 create table second_position (name text primary key);
 insert into second_position (name) values ('Sales'), ('Support');
 
--- ---- main_listing_database / property_detail / last_match ----
+-- ---- main_4_listing_database / main_3_property_detail / last_match ----
 create table listing_status (name text primary key);
 insert into listing_status (name) values
   ('Posted'), ('Ready to Post'), ('Update'), ('Need Info'),
@@ -130,7 +141,7 @@ create table zone (
   zone_id          text primary key,                      -- Zone ID (ตัวย่อ) ใช้ประกอบ Listing ID
   name_eng         text,
   name_thai        text,
-  sale_id_assigned text,                                  -- Sale_id_Assigned -> main_hr (FK เพิ่มท้ายไฟล์)
+  sale_id_assigned text,                                  -- Sale_id_Assigned -> main_1_hr (FK เพิ่มท้ายไฟล์)
   created_at       timestamptz default now()
 );
 insert into zone (zone_id, name_eng, name_thai) values
@@ -176,9 +187,9 @@ insert into listing_potential (name) values
 
 
 -- ============================================================
--- 2) TABLE: main_hr  (+ auto Employee Code)
+-- 2) TABLE: main_1_hr  (+ auto Employee Code)
 -- ============================================================
-create table main_hr (
+create table main_1_hr (
   employee_code   text primary key,        -- auto-run
   status          text references employee_status (name) on update cascade,
   division        text,
@@ -197,7 +208,7 @@ create table main_hr (
   agreement_files text,
   emergency_contact text, emergency_contact_phone text, emergency_contact_relationship text,
   remark          text,  kbank_account text,
-  line_userid     text,                    -- << main_lead_database ดึงไปใช้
+  line_userid     text,                    -- << main_5_lead_database ดึงไปใช้
   payslip_drive   text,
   created_at      timestamptz default now()
 );
@@ -214,24 +225,24 @@ begin
                      when 'Listing Support' then 'LS' when 'Marketing' then 'MK' else 'E' end;
     end if;
     select coalesce(max(substring(employee_code from '[0-9]+$')::int),0)+1 into next_num
-      from main_hr where split_part(employee_code,'-',1) = prefix;
+      from main_1_hr where split_part(employee_code,'-',1) = prefix;
     new.employee_code := prefix || '-' || lpad(next_num::text,3,'0');
   end if;
   return new;
 end; $$;
-drop trigger if exists trg_set_hr_employee_code on main_hr;
-create trigger trg_set_hr_employee_code before insert on main_hr
+drop trigger if exists trg_set_hr_employee_code on main_1_hr;
+create trigger trg_set_hr_employee_code before insert on main_1_hr
   for each row execute function set_hr_employee_code();
 
--- zone.sale_id_assigned -> main_hr (ต้องรอ main_hr ก่อน จึงเพิ่มตรงนี้)
+-- zone.sale_id_assigned -> main_1_hr (ต้องรอ main_1_hr ก่อน จึงเพิ่มตรงนี้)
 alter table zone add constraint fk_zone_sale
-  foreign key (sale_id_assigned) references main_hr (employee_code) on update cascade;
+  foreign key (sale_id_assigned) references main_1_hr (employee_code) on update cascade;
 
 
 -- ============================================================
--- 3) TABLE: main_owner  (Owner 1 คน -> หลาย listing)
+-- 3) TABLE: main_2_owner  (Owner 1 คน -> หลาย listing)
 -- ============================================================
-create table main_owner (
+create table main_2_owner (
   owner_id    bigint generated always as identity primary key,
   owner_name  text, owner_phone text, owner_line text,
   remark      text,
@@ -240,9 +251,9 @@ create table main_owner (
 
 
 -- ============================================================
--- 4) TABLE: property_detail  (+ auto Project ID : PROJECT-001)
+-- 4) TABLE: main_3_property_detail  (+ auto Project ID : PROJECT-001)
 -- ============================================================
-create table property_detail (
+create table main_3_property_detail (
   project_id           text primary key,
   project_name_eng     text,  project_name_thai text,
   property_type        text references property_type (name) on update cascade,
@@ -254,7 +265,7 @@ create table property_detail (
   rental_price_in_project text,  flooding boolean,
   resident_occupation  text,  project_sold_price text,
   pros text, cons text,
-  sales_id             text references main_hr (employee_code) on update cascade,  -- Sales_id
+  sales_id             text references main_1_hr (employee_code) on update cascade,  -- Sales_id
   date_created         date default current_date,
   updated_at           timestamptz default now(),
   created_at           timestamptz default now()
@@ -265,31 +276,31 @@ returns trigger language plpgsql as $$
 declare next_num int;
 begin
   if new.project_id is null or new.project_id = '' then
-    select coalesce(max(substring(project_id from '[0-9]+$')::int),0)+1 into next_num from property_detail;
+    select coalesce(max(substring(project_id from '[0-9]+$')::int),0)+1 into next_num from main_3_property_detail;
     new.project_id := 'PROJECT-' || lpad(next_num::text,3,'0');
   end if;
   return new;
 end; $$;
-drop trigger if exists trg_set_project_id on property_detail;
-create trigger trg_set_project_id before insert on property_detail
+drop trigger if exists trg_set_project_id on main_3_property_detail;
+create trigger trg_set_project_id before insert on main_3_property_detail
   for each row execute function set_project_id();
 
 create or replace function set_updated_at()
 returns trigger language plpgsql as $$
 begin new.updated_at := now(); return new; end; $$;
-drop trigger if exists trg_property_detail_updated on property_detail;
-create trigger trg_property_detail_updated before update on property_detail
+drop trigger if exists trg_main_3_property_detail_updated on main_3_property_detail;
+create trigger trg_main_3_property_detail_updated before update on main_3_property_detail
   for each row execute function set_updated_at();
 
 
 -- ============================================================
--- 5) TABLE: main_listing_database  (+ auto Listing ID : HRM5001)
+-- 5) TABLE: main_4_listing_database  (+ auto Listing ID : HRM5001)
 -- ============================================================
-create table main_listing_database (
+create table main_4_listing_database (
   listing_id         text primary key,        -- auto-run
   date_created       date default current_date,
-  listing_name       text,                    -- << ดึงจาก property_detail ได้
-  project_id         text references property_detail (project_id) on update cascade,  -- โยงโครงการ
+  listing_name       text,                    -- << ดึงจาก main_3_property_detail ได้
+  project_id         text references main_3_property_detail (project_id) on update cascade,  -- โยงโครงการ
   listing_status     text references listing_status (name)    on update cascade,
   potential          text references listing_potential (name) on update cascade,  -- Potential (FK)
   sign               boolean default false,
@@ -300,10 +311,10 @@ create table main_listing_database (
   facebook_link      text,
   old_price          numeric,  new_price numeric,  update_remark text,
   owner_focus        boolean default false,
-  project_name_eng   text,                    -- << ดึงจาก property_detail ได้
+  project_name_eng   text,                    -- << ดึงจาก main_3_property_detail ได้
   listing_type       text references listing_type (name) on update cascade,
   unit_no            text,
-  owner_id           bigint references main_owner (owner_id),
+  owner_id           bigint references main_2_owner (owner_id),
   owner_talk_last_date date,  activity_comment text,
   property_type      text references property_type (name)  on update cascade,
   in_out_project     text references in_out_project (name) on update cascade,
@@ -337,13 +348,13 @@ begin
     end if;
     prefix := v_code || new.zone;   -- new.zone = Zone ID (ตัวย่อ)
     select coalesce(max(substring(listing_id from length(prefix)+1)::int),0)+1 into next_num
-      from main_listing_database where left(listing_id, length(prefix)) = prefix;
+      from main_4_listing_database where left(listing_id, length(prefix)) = prefix;
     new.listing_id := prefix || lpad(next_num::text,3,'0');
   end if;
   return new;
 end; $$;
-drop trigger if exists trg_set_listing_id on main_listing_database;
-create trigger trg_set_listing_id before insert on main_listing_database
+drop trigger if exists trg_set_listing_id on main_4_listing_database;
+create trigger trg_set_listing_id before insert on main_4_listing_database
   for each row execute function set_listing_id();
 
 create or replace function set_livinginsider_date()
@@ -356,31 +367,31 @@ begin
   new.updated_at := now();
   return new;
 end; $$;
-drop trigger if exists trg_set_livinginsider_date on main_listing_database;
-create trigger trg_set_livinginsider_date before insert or update on main_listing_database
+drop trigger if exists trg_set_livinginsider_date on main_4_listing_database;
+create trigger trg_set_livinginsider_date before insert or update on main_4_listing_database
   for each row execute function set_livinginsider_date();
 
 
 -- ============================================================
--- 6) TABLE: main_lead_database  (+ auto Lead-Id : L26-001)
+-- 6) TABLE: main_5_lead_database  (+ auto Lead-Id : L26-001)
 -- ============================================================
-create table main_lead_database (
+create table main_5_lead_database (
   lead_id            text primary key,        -- auto-run
   date_received      date,
   lead_type          text references lead_type (name) on update cascade,
-  listing_code       text references main_listing_database (listing_id) on update cascade,  -- โยง listing
+  listing_code       text references main_4_listing_database (listing_id) on update cascade,  -- โยง listing
   listing_name       text,
   lead_name text, phone text, line_id text,
   gender             text references gender (name)      on update cascade,
   nationality        text references nationality (name) on update cascade default 'Thai',
   remark text,
-  sales_id           text references main_hr (employee_code) on update cascade,  -- โยง HR
+  sales_id           text references main_1_hr (employee_code) on update cascade,  -- โยง HR
   contact_date date,
   contact_time time,
   marketing_channel       text references marketing_channel (name) on update cascade,
   marketing_channel_other text,
   contact_by              text references contact_by (name) on update cascade,
-  line_userid text,                          -- ดึงจาก main_hr ผ่าน sales_id (ไม่ทำ FK ตรง)
+  line_userid text,                          -- ดึงจาก main_1_hr ผ่าน sales_id (ไม่ทำ FK ตรง)
   customer_complain text,
   complain_status    text references complain_status (name) on update cascade,
   complain_remark text,
@@ -393,20 +404,20 @@ declare yy text := to_char(now(),'YY'); next_num int;
 begin
   if new.lead_id is null or new.lead_id = '' then
     select coalesce(max((split_part(lead_id,'-',2))::int),0)+1 into next_num
-      from main_lead_database where lead_id like 'L' || yy || '-%';
+      from main_5_lead_database where lead_id like 'L' || yy || '-%';
     new.lead_id := 'L' || yy || '-' || lpad(next_num::text,3,'0');
   end if;
   return new;
 end; $$;
-drop trigger if exists trg_set_lead_database_id on main_lead_database;
-create trigger trg_set_lead_database_id before insert on main_lead_database
+drop trigger if exists trg_set_lead_database_id on main_5_lead_database;
+create trigger trg_set_lead_database_id before insert on main_5_lead_database
   for each row execute function set_lead_database_id();
 
 
 -- ============================================================
--- 7) TABLE: main_buyer_crm  (โยง lead + hr)
+-- 7) TABLE: main_6_buyer_crm  (โยง lead + hr)
 -- ============================================================
-create table main_buyer_crm (
+create table main_6_buyer_crm (
   lead_id          text primary key,          -- Lead ID (ของ CRM)
   date_received    date,
   listing_code     text,
@@ -416,8 +427,8 @@ create table main_buyer_crm (
   bank_loan        text references bank_loan (name)      on update cascade,
   interested       text,                       -- ดึงผ่าน lead_ref ได้
   lead_type        text references lead_type (name) on update cascade,  -- dropdown
-  lead_ref         text references main_lead_database (lead_id) on update cascade,  -- โยงลีด
-  sale_id          text references main_hr (employee_code) on update cascade,       -- โยง HR
+  lead_ref         text references main_5_lead_database (lead_id) on update cascade,  -- โยงลีด
+  sale_id          text references main_1_hr (employee_code) on update cascade,       -- โยง HR
   lead_name text, phone text, admin_remark text, line_id text,
   budget numeric, progress int,
   last_follow_date date, activity_comment text, commission numeric,
@@ -428,11 +439,11 @@ create table main_buyer_crm (
 
 
 -- ============================================================
--- 8) TABLE: main_last_match  (+ auto Last Match ID : Sale_id + เลขรัน)
+-- 8) TABLE: main_7_last_match  (+ auto Last Match ID : Sale_id + เลขรัน)
 -- ============================================================
-create table main_last_match (
+create table main_7_last_match (
   last_match_id     text primary key,
-  sale_id           text references main_hr (employee_code) on update cascade,
+  sale_id           text references main_1_hr (employee_code) on update cascade,
   close_type        text references close_type (name)    on update cascade,
   project_name      text,
   property_type     text references property_type (name) on update cascade,
@@ -452,25 +463,76 @@ begin
       raise exception 'ต้องระบุ sale_id ก่อน (เพื่อสร้าง Last Match ID)';
     end if;
     select coalesce(max(substring(last_match_id from '[0-9]+$')::int),0)+1 into next_num
-      from main_last_match where sale_id = new.sale_id;
+      from main_7_last_match where sale_id = new.sale_id;
     new.last_match_id := new.sale_id || '-' || lpad(next_num::text,3,'0');
   end if;
   return new;
 end; $$;
-drop trigger if exists trg_set_last_match_id on main_last_match;
-create trigger trg_set_last_match_id before insert on main_last_match
+drop trigger if exists trg_set_last_match_id on main_7_last_match;
+create trigger trg_set_last_match_id before insert on main_7_last_match
   for each row execute function set_last_match_id();
 
 
 -- ============================================================
--- 9) TABLE: main_listing_photo
+-- 9) TABLE: main_8_listing_photo
 -- ============================================================
-create table main_listing_photo (
+create table main_8_listing_photo (
   photo_id    bigint generated always as identity primary key,
-  listing_id  text references main_listing_database (listing_id) on delete cascade,
+  listing_id  text references main_4_listing_database (listing_id) on delete cascade,
   photo_url   text, sort_order int,
   created_at  timestamptz default now()
 );
+
+
+-- ============================================================
+-- 9.1) TABLE: main_9_support_log  (log การทำงานของ Support)
+-- 1 แถว = 1 การกระทำ (เปลี่ยนสถานะ/จัดการ listing 1 ครั้ง)
+-- ============================================================
+create table main_9_support_log (
+  log_id        bigint generated always as identity primary key,
+  listing_id    text references main_4_listing_database (listing_id) on delete cascade,
+  support_id    text references main_1_hr (employee_code) on update cascade,  -- ใครทำ (Support)
+  action        text,                                          -- ทำอะไร (freeform)
+  status_before text references listing_status (name) on update cascade,      -- สถานะก่อนแก้
+  status_after  text references listing_status (name) on update cascade,      -- สถานะหลังแก้
+  remark        text,
+  created_at    timestamptz default now()
+);
+
+
+-- ============================================================
+-- 9.2) TABLE: main_10_potential_listing  (แยกเฉพาะ listing potential สูง)
+-- Hybrid: auto ดึงเข้ามาเมื่อ potential ∈ (A List / A List + Fb add / Exclusive / Exclusive A)
+--         + มีคอลัมน์ให้ Support กรอกเอง (headline/support_note/remark) — ไว้ทำหัวข้อแยกทีหลัง
+-- หมายเหตุ: ตอนนี้ "ไม่ลบออกอัตโนมัติ" ถ้า potential เปลี่ยนออกจากเกณฑ์ (กันข้อมูลที่กรอกเองหาย)
+-- ============================================================
+create table main_10_potential_listing (
+  listing_id   text primary key references main_4_listing_database (listing_id) on delete cascade,
+  potential    text references listing_potential (name) on update cascade,  -- auto-sync จาก listing
+  -- ===== ส่วนที่ Support กรอกเอง (จะมีหัวข้อแยกเพิ่มภายหลัง) =====
+  headline     text,
+  support_note text,
+  remark       text,
+  updated_at   timestamptz default now(),
+  created_at   timestamptz default now()
+);
+
+-- trigger: เมื่อ listing มี potential เข้าเกณฑ์ -> upsert เข้า main_10_potential_listing
+create or replace function sync_potential_listing()
+returns trigger language plpgsql as $$
+begin
+  if new.potential in ('A List','A List + Fb add','Exclusive','Exclusive A') then
+    insert into main_10_potential_listing (listing_id, potential)
+      values (new.listing_id, new.potential)
+    on conflict (listing_id)
+      do update set potential = excluded.potential, updated_at = now();
+  end if;
+  return new;
+end; $$;
+drop trigger if exists trg_sync_potential_listing on main_4_listing_database;
+create trigger trg_sync_potential_listing
+  after insert or update of potential on main_4_listing_database
+  for each row execute function sync_potential_listing();
 
 
 -- ============================================================
@@ -486,9 +548,22 @@ select
   o.owner_name, o.owner_phone, o.owner_line,
   case when l.livinginsider_date is not null
        then (current_date - l.livinginsider_date) end as days_on_market
-from main_listing_database l
-left join main_owner o on o.owner_id = l.owner_id
+from main_4_listing_database l
+left join main_2_owner o on o.owner_id = l.owner_id
 left join zone       z on z.zone_id  = l.zone;
+
+
+-- ============================================================
+-- 10.1) VIEW: v_support_listing  (คิว Support — เฉพาะ listing ที่รอจัดการ)
+-- โชว์เฉพาะ listing_status ∈ (Ready to Post / Cancel / Update / Sold)
+-- พอ Support จัดการเสร็จ (เปลี่ยนสถานะเป็นอย่างอื่น เช่น Posted/Cancel Completed/Sold Completed)
+-- แถวนั้นก็หลุดออกจาก view อัตโนมัติ
+-- ============================================================
+create or replace view v_support_listing
+with (security_invoker = true) as
+select *
+from v_main_listing
+where listing_status in ('Ready to Post', 'Cancel', 'Update', 'Sold');
 
 
 -- ============================================================
@@ -506,63 +581,63 @@ select
   h.status                              as employee_status,
   h.zone_sales,
 
-  -- ลีดที่ได้รับมอบหมาย (main_lead_database)
-  (select count(*) from main_lead_database ld
+  -- ลีดที่ได้รับมอบหมาย (main_5_lead_database)
+  (select count(*) from main_5_lead_database ld
      where ld.sales_id = h.employee_code)                              as total_leads,
 
-  -- ดีลใน CRM (main_buyer_crm)
-  (select count(*) from main_buyer_crm b
+  -- ดีลใน CRM (main_6_buyer_crm)
+  (select count(*) from main_6_buyer_crm b
      where b.sale_id = h.employee_code)                               as total_crm,
-  (select count(*) from main_buyer_crm b
+  (select count(*) from main_6_buyer_crm b
      where b.sale_id = h.employee_code and b.lead_status = 'Win')     as crm_win,
-  (select count(*) from main_buyer_crm b
+  (select count(*) from main_6_buyer_crm b
      where b.sale_id = h.employee_code and b.complete)                as crm_complete,
-  (select coalesce(sum(b.commission),0) from main_buyer_crm b
+  (select coalesce(sum(b.commission),0) from main_6_buyer_crm b
      where b.sale_id = h.employee_code)                               as total_commission,
 
-  -- listing ในโซนที่รับผิดชอบ (main_listing_database + zone)
-  (select count(*) from main_listing_database l
+  -- listing ในโซนที่รับผิดชอบ (main_4_listing_database + zone)
+  (select count(*) from main_4_listing_database l
      join zone z on z.zone_id = l.zone
      where z.sale_id_assigned = h.employee_code)                      as total_listings,
 
-  -- ดีลที่ปิดได้ (main_last_match)
-  (select count(*) from main_last_match m
+  -- ดีลที่ปิดได้ (main_7_last_match)
+  (select count(*) from main_7_last_match m
      where m.sale_id = h.employee_code)                               as total_matches,
-  (select coalesce(sum(m.last_match_price),0) from main_last_match m
+  (select coalesce(sum(m.last_match_price),0) from main_7_last_match m
      where m.sale_id = h.employee_code)                               as total_match_value,
 
   -- ==== Listing Potential : นับ listing ของเซลแยกตาม Potential ====
-  (select count(*) from main_listing_database l join zone z on z.zone_id=l.zone
+  (select count(*) from main_4_listing_database l join zone z on z.zone_id=l.zone
      where z.sale_id_assigned=h.employee_code and l.potential='Normal')          as lst_normal,
-  (select count(*) from main_listing_database l join zone z on z.zone_id=l.zone
+  (select count(*) from main_4_listing_database l join zone z on z.zone_id=l.zone
      where z.sale_id_assigned=h.employee_code and l.potential='A List')          as lst_a_list,
-  (select count(*) from main_listing_database l join zone z on z.zone_id=l.zone
+  (select count(*) from main_4_listing_database l join zone z on z.zone_id=l.zone
      where z.sale_id_assigned=h.employee_code and l.potential='A List + Fb add') as lst_a_list_fb,
-  (select count(*) from main_listing_database l join zone z on z.zone_id=l.zone
+  (select count(*) from main_4_listing_database l join zone z on z.zone_id=l.zone
      where z.sale_id_assigned=h.employee_code and l.potential='Exclusive')       as lst_exclusive,
-  (select count(*) from main_listing_database l join zone z on z.zone_id=l.zone
+  (select count(*) from main_4_listing_database l join zone z on z.zone_id=l.zone
      where z.sale_id_assigned=h.employee_code and l.potential='Exclusive A')     as lst_exclusive_a,
 
   -- ==== CRM Potential : นับลีดใน CRM ของเซลแยกตาม Potential ====
-  (select count(*) from main_buyer_crm b where b.sale_id=h.employee_code and b.potential='A')        as crm_a,
-  (select count(*) from main_buyer_crm b where b.sale_id=h.employee_code and b.potential='B')        as crm_b,
-  (select count(*) from main_buyer_crm b where b.sale_id=h.employee_code and b.potential='C')        as crm_c,
-  (select count(*) from main_buyer_crm b where b.sale_id=h.employee_code and b.potential='New Lead') as crm_new_lead,
-  (select count(*) from main_buyer_crm b where b.sale_id=h.employee_code and b.potential='Agent')    as crm_agent,
+  (select count(*) from main_6_buyer_crm b where b.sale_id=h.employee_code and b.potential='A')        as crm_a,
+  (select count(*) from main_6_buyer_crm b where b.sale_id=h.employee_code and b.potential='B')        as crm_b,
+  (select count(*) from main_6_buyer_crm b where b.sale_id=h.employee_code and b.potential='C')        as crm_c,
+  (select count(*) from main_6_buyer_crm b where b.sale_id=h.employee_code and b.potential='New Lead') as crm_new_lead,
+  (select count(*) from main_6_buyer_crm b where b.sale_id=h.employee_code and b.potential='Agent')    as crm_agent,
 
   -- ==== ลูกค้าที่เข้ามาผ่าน Listing : นับลีดตาม Potential ของ listing ที่เขาเข้ามา ====
-  -- (main_lead_database.listing_code -> main_listing_database.listing_id -> potential)
-  (select count(*) from main_lead_database ld join main_listing_database l on l.listing_id=ld.listing_code
+  -- (main_5_lead_database.listing_code -> main_4_listing_database.listing_id -> potential)
+  (select count(*) from main_5_lead_database ld join main_4_listing_database l on l.listing_id=ld.listing_code
      where ld.sales_id=h.employee_code and l.potential='Normal')          as leadvia_normal,
-  (select count(*) from main_lead_database ld join main_listing_database l on l.listing_id=ld.listing_code
+  (select count(*) from main_5_lead_database ld join main_4_listing_database l on l.listing_id=ld.listing_code
      where ld.sales_id=h.employee_code and l.potential='A List')          as leadvia_a_list,
-  (select count(*) from main_lead_database ld join main_listing_database l on l.listing_id=ld.listing_code
+  (select count(*) from main_5_lead_database ld join main_4_listing_database l on l.listing_id=ld.listing_code
      where ld.sales_id=h.employee_code and l.potential='A List + Fb add') as leadvia_a_list_fb,
-  (select count(*) from main_lead_database ld join main_listing_database l on l.listing_id=ld.listing_code
+  (select count(*) from main_5_lead_database ld join main_4_listing_database l on l.listing_id=ld.listing_code
      where ld.sales_id=h.employee_code and l.potential='Exclusive')       as leadvia_exclusive,
-  (select count(*) from main_lead_database ld join main_listing_database l on l.listing_id=ld.listing_code
+  (select count(*) from main_5_lead_database ld join main_4_listing_database l on l.listing_id=ld.listing_code
      where ld.sales_id=h.employee_code and l.potential='Exclusive A')     as leadvia_exclusive_a
-from main_hr h;
+from main_1_hr h;
 
 
 -- ============================================================
@@ -585,27 +660,29 @@ as $$
   select
     h.employee_code,
     h.nickname,
-    (select count(*) from main_lead_database ld
+    (select count(*) from main_5_lead_database ld
        where ld.sales_id=h.employee_code and ld.date_received between p_start and p_end),
-    (select count(*) from main_buyer_crm b
+    (select count(*) from main_6_buyer_crm b
        where b.sale_id=h.employee_code and b.date_received between p_start and p_end),
-    (select count(*) from main_buyer_crm b
+    (select count(*) from main_6_buyer_crm b
        where b.sale_id=h.employee_code and b.lead_status='Win'
          and b.closing_date between p_start and p_end),
-    (select coalesce(sum(b.commission),0) from main_buyer_crm b
+    (select coalesce(sum(b.commission),0) from main_6_buyer_crm b
        where b.sale_id=h.employee_code and b.closing_date between p_start and p_end),
-    (select count(*) from main_last_match m
+    (select count(*) from main_7_last_match m
        where m.sale_id=h.employee_code and m.date_created between p_start and p_end),
-    (select coalesce(sum(m.last_match_price),0) from main_last_match m
+    (select coalesce(sum(m.last_match_price),0) from main_7_last_match m
        where m.sale_id=h.employee_code and m.date_created between p_start and p_end)
-  from main_hr h;
+  from main_1_hr h;
 $$;
 
 
 -- ============================================================
--- เสร็จแล้ว — 27 ตาราง + 2 view + 1 function (fn_sale_status), FK เชื่อมครบ
+-- เสร็จแล้ว — 35 ตาราง + 3 view + 1 function (fn_sale_status), FK เชื่อมครบ
+-- ตาราง main ใส่เลขนำหน้าแล้ว: main_1_hr ... main_10_potential_listing (เรียงกลุ่มใน Supabase)
 -- auto ID: employee_code / listing_id / lead_id / project_id / last_match_id
+-- Support: v_support_listing (view คิวงาน) + main_9_support_log + main_10_potential_listing (auto+กรอกเอง)
 -- ยังค้าง: RLS (แยกข้อมูล listing ตาม created_by) — ทำแยกไฟล์
--- Import ตัวอย่าง: main_buyer_crm <- buyer_crm_sample.csv ,
---                  main_lead_database <- lead_database_sample.csv
+-- Import ตัวอย่าง: main_6_buyer_crm <- buyer_crm_sample.csv ,
+--                  main_5_lead_database <- lead_database_sample.csv
 -- ============================================================
