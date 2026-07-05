@@ -12,6 +12,7 @@
 -- ============================================================
 drop view  if exists v_support_listing     cascade;
 drop view  if exists v_main_listing        cascade;
+drop table if exists main_11_potential_listing_log cascade;
 drop table if exists main_10_potential_listing cascade;
 drop table if exists main_9_support_log     cascade;
 drop table if exists main_8_listing_photo     cascade;
@@ -195,7 +196,6 @@ create table main_1_hr (
   division        text,
   position        text references job_position (name)    on update cascade,
   second_position text references second_position (name) on update cascade,
-  zone_sales      text,                    -- Zone(Sales) << แปะไว้ก่อน
   first_name_en   text,  last_name_en  text,
   first_name_th   text,  last_name_th  text,
   nickname        text,
@@ -299,8 +299,7 @@ create trigger trg_main_3_property_detail_updated before update on main_3_proper
 create table main_4_listing_database (
   listing_id         text primary key,        -- auto-run
   date_created       date default current_date,
-  listing_name       text,                    -- << ดึงจาก main_3_property_detail ได้
-  project_id         text references main_3_property_detail (project_id) on update cascade,  -- โยงโครงการ
+  project_id         text references main_3_property_detail (project_id) on update cascade,  -- โยงโครงการ (listing_name/project_name_eng ดึงจากโครงการนี้ผ่าน v_main_listing)
   listing_status     text references listing_status (name)    on update cascade,
   potential          text references listing_potential (name) on update cascade,  -- Potential (FK)
   sign               boolean default false,
@@ -308,10 +307,9 @@ create table main_4_listing_database (
   ddproperty_link    text,
   livinginsider_link text,
   livinginsider_date date,                    -- auto ตอนกรอกลิงก์ครั้งแรก (คิด Days on Market)
-  facebook_link      text,
+  propertyhub_link   text,                    -- (เดิม facebook_link)
   old_price          numeric,  new_price numeric,  update_remark text,
   owner_focus        boolean default false,
-  project_name_eng   text,                    -- << ดึงจาก main_3_property_detail ได้
   listing_type       text references listing_type (name) on update cascade,
   unit_no            text,
   owner_id           bigint references main_2_owner (owner_id),
@@ -499,39 +497,129 @@ create table main_9_support_log (
   created_at    timestamptz default now()
 );
 
-
--- ============================================================
--- 9.2) TABLE: main_10_potential_listing  (แยกเฉพาะ listing potential สูง)
--- Hybrid: auto ดึงเข้ามาเมื่อ potential ∈ (A List / A List + Fb add / Exclusive / Exclusive A)
---         + มีคอลัมน์ให้ Support กรอกเอง (headline/support_note/remark) — ไว้ทำหัวข้อแยกทีหลัง
--- หมายเหตุ: ตอนนี้ "ไม่ลบออกอัตโนมัติ" ถ้า potential เปลี่ยนออกจากเกณฑ์ (กันข้อมูลที่กรอกเองหาย)
--- ============================================================
-create table main_10_potential_listing (
-  listing_id   text primary key references main_4_listing_database (listing_id) on delete cascade,
-  potential    text references listing_potential (name) on update cascade,  -- auto-sync จาก listing
-  -- ===== ส่วนที่ Support กรอกเอง (จะมีหัวข้อแยกเพิ่มภายหลัง) =====
-  headline     text,
-  support_note text,
-  remark       text,
-  updated_at   timestamptz default now(),
-  created_at   timestamptz default now()
-);
-
--- trigger: เมื่อ listing มี potential เข้าเกณฑ์ -> upsert เข้า main_10_potential_listing
-create or replace function sync_potential_listing()
+-- trigger: auto บันทึก log เมื่อ listing_status เปลี่ยน (และตอนสร้าง listing ใหม่)
+-- support_id (ใครทำ) = null ไว้ก่อน — DB รู้แค่ auth.uid() (uuid) ยังไม่มี mapping -> main_1_hr.employee_code
+-- (ค่อยเติมตอนทำ RLS/auth mapping) ; แอปจะ update support_id เพิ่มทีหลังก็ได้
+create or replace function log_listing_status_change()
 returns trigger language plpgsql as $$
 begin
-  if new.potential in ('A List','A List + Fb add','Exclusive','Exclusive A') then
-    insert into main_10_potential_listing (listing_id, potential)
-      values (new.listing_id, new.potential)
-    on conflict (listing_id)
-      do update set potential = excluded.potential, updated_at = now();
+  if tg_op = 'INSERT' then
+    if new.listing_status is not null then
+      insert into main_9_support_log (listing_id, action, status_before, status_after)
+        values (new.listing_id, 'created', null, new.listing_status);
+    end if;
+  elsif tg_op = 'UPDATE' then
+    if new.listing_status is distinct from old.listing_status then
+      insert into main_9_support_log (listing_id, action, status_before, status_after)
+        values (new.listing_id, 'status change', old.listing_status, new.listing_status);
+    end if;
   end if;
+  return null;  -- AFTER trigger : return value ไม่ถูกใช้
+end; $$;
+drop trigger if exists trg_log_listing_status on main_4_listing_database;
+create trigger trg_log_listing_status
+  after insert or update of listing_status on main_4_listing_database
+  for each row execute function log_listing_status_change();
+
+
+-- ============================================================
+-- 9.2) TABLE: main_10_potential_listing  (แยกเฉพาะ listing potential สูง = A List/Exclusive)
+-- Hybrid: คอลัมน์ auto ดึงจาก listing (trigger) + คอลัมน์ให้ Support กรอกเอง
+-- • เข้าเกณฑ์ (A List/A List + Fb add/Exclusive/Exclusive A) -> upsert เข้ามา
+-- • หลุดเกณฑ์ (เช่นเซลเปลี่ยน potential เป็น Normal) -> เก็บ log แล้ว "ลบออก"
+-- ============================================================
+create table main_10_potential_listing (
+  listing_id        text primary key references main_4_listing_database (listing_id) on delete cascade,
+  date_a_list       date,                                       -- Date A List (วันที่เข้าเกณฑ์ - auto ตอน insert)
+  potential         text references listing_potential (name) on update cascade,  -- auto-sync
+  project_name_thai text,                                       -- Project name (ไทย) - auto ดึงจากโครงการ
+  unit_condition    text references unit_condition (name) on update cascade,  -- auto ดึงจาก listing
+  price             numeric,                                    -- Price - auto (asking_price / new_price)
+  sale_id           text references main_1_hr (employee_code) on update cascade,  -- auto จากโซนที่รับผิดชอบ
+
+  -- ===== ส่วนที่ Support กรอกเอง (trigger ไม่แตะ) =====
+  template_link     text,                                       -- Template Link
+  marketplace       boolean default false,                      -- Market Place
+  profile           boolean default false,                      -- Profile
+  group_date        date,                                       -- Group (ใส่วันที่เอง)
+  group_boost_date  date,                                       -- Group Boost (ใส่วันที่เอง)
+
+  -- ===== ลิงก์ - auto ดึงจาก listing =====
+  ddproperty_link   text,
+  livinginsider_link text,
+  propertyhub_link  text,                                       -- (เดิม facebook_link)
+
+  updated_at        timestamptz default now(),
+  created_at        timestamptz default now()
+);
+
+-- Log ประวัติเข้า/ออกเกณฑ์ A List (เก็บไว้แม้ลบออกจาก main_10 แล้ว)
+create table main_11_potential_listing_log (
+  log_id      bigint generated always as identity primary key,
+  listing_id  text,                        -- ไม่ทำ FK เพื่อให้ log อยู่ต่อแม้ listing ถูกลบ
+  potential   text,                        -- potential ตอนเกิดเหตุการณ์
+  action      text,                        -- 'added' | 'removed'
+  sale_id     text,
+  date_a_list date,
+  changed_at  timestamptz default now()
+);
+
+-- trigger: sync listing potential สูง เข้า/ออก main_10 + เขียน log
+create or replace function sync_potential_listing()
+returns trigger language plpgsql as $$
+declare
+  v_tier      boolean := new.potential in ('A List','A List + Fb add','Exclusive','Exclusive A');
+  v_exists    boolean;
+  v_sale      text;
+  v_proj_thai text;
+begin
+  select exists(select 1 from main_10_potential_listing where listing_id = new.listing_id) into v_exists;
+
+  if v_tier then
+    -- ดึงค่าประกอบแบบ auto
+    select sale_id_assigned  into v_sale      from zone where zone_id = new.zone;
+    select project_name_thai into v_proj_thai from main_3_property_detail where project_id = new.project_id;
+
+    insert into main_10_potential_listing (
+      listing_id, date_a_list, potential, project_name_thai, unit_condition, price, sale_id,
+      ddproperty_link, livinginsider_link, propertyhub_link
+    ) values (
+      new.listing_id, current_date, new.potential, v_proj_thai, new.unit_condition,
+      new.asking_price, v_sale,
+      new.ddproperty_link, new.livinginsider_link, new.propertyhub_link
+    )
+    on conflict (listing_id) do update set
+      potential          = excluded.potential,
+      project_name_thai  = excluded.project_name_thai,
+      unit_condition     = excluded.unit_condition,
+      price              = excluded.price,
+      sale_id            = excluded.sale_id,
+      ddproperty_link    = excluded.ddproperty_link,
+      livinginsider_link = excluded.livinginsider_link,
+      propertyhub_link   = excluded.propertyhub_link,
+      updated_at         = now();
+      -- ไม่แตะ date_a_list และคอลัมน์ที่ Support กรอกเอง (template_link/marketplace/profile/group_*)
+
+    if not v_exists then
+      insert into main_11_potential_listing_log (listing_id, potential, action, sale_id, date_a_list)
+        values (new.listing_id, new.potential, 'added', v_sale, current_date);
+    end if;
+
+  else
+    -- หลุดเกณฑ์: ถ้ามีอยู่ -> log 'removed' แล้วลบออก
+    if v_exists then
+      insert into main_11_potential_listing_log (listing_id, potential, action, sale_id, date_a_list)
+        select p.listing_id, new.potential, 'removed', p.sale_id, p.date_a_list
+        from main_10_potential_listing p where p.listing_id = new.listing_id;
+      delete from main_10_potential_listing where listing_id = new.listing_id;
+    end if;
+  end if;
+
   return new;
 end; $$;
 drop trigger if exists trg_sync_potential_listing on main_4_listing_database;
 create trigger trg_sync_potential_listing
-  after insert or update of potential on main_4_listing_database
+  after insert or update on main_4_listing_database
   for each row execute function sync_potential_listing();
 
 
@@ -543,12 +631,15 @@ create or replace view v_main_listing
 with (security_invoker = true) as
 select
   l.*,
+  p.project_name_thai as listing_name,       -- ดึงจากโครงการ (แทน text เดิม)
+  p.project_name_eng  as project_name_eng,   -- ดึงจากโครงการ
   z.name_thai as zone_name_thai,
   z.name_eng  as zone_name_eng,
   o.owner_name, o.owner_phone, o.owner_line,
   case when l.livinginsider_date is not null
        then (current_date - l.livinginsider_date) end as days_on_market
 from main_4_listing_database l
+left join main_3_property_detail p on p.project_id = l.project_id
 left join main_2_owner o on o.owner_id = l.owner_id
 left join zone       z on z.zone_id  = l.zone;
 
@@ -579,7 +670,8 @@ select
   h.first_name_en,
   h.last_name_en,
   h.status                              as employee_status,
-  h.zone_sales,
+  (select string_agg(z.zone_id, ', ' order by z.zone_id)
+     from zone z where z.sale_id_assigned = h.employee_code)          as zones,
 
   -- ลีดที่ได้รับมอบหมาย (main_5_lead_database)
   (select count(*) from main_5_lead_database ld
@@ -678,8 +770,25 @@ $$;
 
 
 -- ============================================================
--- เสร็จแล้ว — 35 ตาราง + 3 view + 1 function (fn_sale_status), FK เชื่อมครบ
--- ตาราง main ใส่เลขนำหน้าแล้ว: main_1_hr ... main_10_potential_listing (เรียงกลุ่มใน Supabase)
+-- 11.2) VIEW: v_sale_zones  (เซลแต่ละคนดูแลโซนไหนบ้าง — derive จากตาราง zone)
+-- แทนคอลัมน์ main_1_hr.zone_sales เดิม (ที่ลบไปแล้ว)
+-- ============================================================
+create or replace view v_sale_zones
+with (security_invoker = true) as
+select
+  h.employee_code,
+  h.nickname,
+  count(z.zone_id)                                 as zone_count,
+  string_agg(z.zone_id,   ', ' order by z.zone_id) as zone_ids,    -- เช่น "RM2, RM5, PKS"
+  string_agg(z.name_thai, ', ' order by z.zone_id) as zone_names   -- เช่น "พระราม 2, พระราม 5, เพชรเกษม"
+from main_1_hr h
+left join zone z on z.sale_id_assigned = h.employee_code
+group by h.employee_code, h.nickname;
+
+
+-- ============================================================
+-- เสร็จแล้ว — 36 ตาราง + 4 view + 1 function (fn_sale_status), FK เชื่อมครบ
+-- ตาราง main ใส่เลขนำหน้าแล้ว: main_1_hr ... main_11_potential_listing_log (เรียงกลุ่มใน Supabase)
 -- auto ID: employee_code / listing_id / lead_id / project_id / last_match_id
 -- Support: v_support_listing (view คิวงาน) + main_9_support_log + main_10_potential_listing (auto+กรอกเอง)
 -- ยังค้าง: RLS (แยกข้อมูล listing ตาม created_by) — ทำแยกไฟล์

@@ -10,7 +10,7 @@
 ## ไฟล์ในโปรเจกต์
 | ไฟล์ | หน้าที่ |
 |---|---|
-| `supabase_full_setup.sql` | **ไฟล์หลักไฟล์เดียว** — รันทีเดียวได้ครบทั้งระบบ (35 ตาราง + 3 view + 1 function) |
+| `supabase_full_setup.sql` | **ไฟล์หลักไฟล์เดียว** — รันทีเดียวได้ครบทั้งระบบ (36 ตาราง + 3 view + 1 function) |
 | `buyer_crm_sample.csv` | ข้อมูลตัวอย่าง import เข้า `main_6_buyer_crm` |
 | `lead_database_sample.csv` | ข้อมูลตัวอย่าง import เข้า `main_5_lead_database` |
 
@@ -28,8 +28,9 @@
 - `main_6_buyer_crm` — CRM pipeline ฝั่งผู้ซื้อ
 - `main_7_last_match` — ดีลที่ปิดได้ (standalone)
 - `main_8_listing_photo` — รูปของ listing (หลายรูป/listing)
-- `main_9_support_log` — log การทำงานของ Support (ใครแก้ listing/เปลี่ยนสถานะเมื่อไหร่)
-- `main_10_potential_listing` — listing potential สูง (A List/Exclusive...) แบบ hybrid: auto ดึงเข้า (trigger) + Support กรอกเองได้ (headline/support_note/remark)
+- `main_9_support_log` — log การทำงานของ Support. **auto-log** ผ่าน trigger `log_listing_status_change` เมื่อสร้าง listing (action='created') หรือ listing_status เปลี่ยน (action='status change', status_before/after). **support_id (ใครทำ) = null ไว้ก่อน** เพราะ DB รู้แค่ auth.uid() ยังไม่มี mapping → employee_code (รอทำตอน RLS)
+- `main_10_potential_listing` — listing potential สูง (A List/Exclusive...) แบบ hybrid: auto ดึงเข้า+อัปเดต+ลบออก (trigger) เมื่อ potential เข้า/หลุดเกณฑ์ + Support กรอกเอง (template_link/marketplace/profile/group_date/group_boost_date). คอลัมน์ auto: date_a_list, project_name_thai, unit_condition, price, sale_id, ddproperty/livinginsider/propertyhub_link
+- `main_11_potential_listing_log` — log ประวัติเข้า/ออกเกณฑ์ A List (action = added/removed) เก็บไว้แม้ลบออกจาก main_10 แล้ว (ไม่ทำ FK)
 
 **Lookup tables (dropdown):** ทุกตัวใช้ `name` เป็น PK (เก็บ/โชว์เป็น "ชื่อ" ไม่ใช่เลข)
 gender, nationality, potential, lead_status, pipeline_stage, bank_loan, lead_type,
@@ -41,7 +42,8 @@ price_remark, unit_condition, close_type
 **View + Function:**
 - `v_main_listing` — listing + ชื่อโซน + owner phone/line + Days on Market (คำนวณ)
 - `v_support_listing` — คิวงาน Support: กรอง `v_main_listing` เฉพาะ `listing_status ∈ (Ready to Post/Cancel/Update/Sold)` → พอ Support เปลี่ยนสถานะเป็นอย่างอื่น แถวหลุดออกเอง
-- `v_sale_status` — แดชบอร์ดผลงานเซลรายคน (all-time) + breakdown ตาม Potential
+- `v_sale_status` — แดชบอร์ดผลงานเซลรายคน (all-time) + breakdown ตาม Potential (คอลัมน์ `zones` derive จากตาราง zone)
+- `v_sale_zones` — เซลแต่ละคนดูแลโซนไหนบ้าง (zone_count, zone_ids, zone_names) derive จาก `zone.sale_id_assigned`
 - `fn_sale_status(start,end)` — สรุปผลงานเซลตามช่วงวันที่กำหนดเอง
 
 ## Convention / การตัดสินใจที่ตกลงกันไว้ (สำคัญ — ทำต่อให้เหมือนเดิม)
@@ -68,15 +70,18 @@ price_remark, unit_condition, close_type
 - `main_4_listing_database.project_id` → main_3_property_detail.project_id
 - `main_5_lead_database.listing_code` → main_4_listing_database.listing_id
 - `main_9_support_log.listing_id` → main_4_listing_database , `.support_id` → main_1_hr , `.status_before/after` → listing_status
-- `main_10_potential_listing.listing_id` → main_4_listing_database (auto sync ผ่าน trigger `sync_potential_listing`) , `.potential` → listing_potential
+- `main_10_potential_listing` → main_4_listing_database (auto sync ผ่าน trigger `sync_potential_listing`: insert/update/delete + เขียน log) , `.sale_id` → main_1_hr , `.unit_condition` → unit_condition , `.potential` → listing_potential
+- `main_11_potential_listing_log` — ไม่ทำ FK (เก็บประวัติแม้ listing ถูกลบ)
 - gender/nationality เป็น lookup ใช้ร่วมหลายตาราง
 
 ## งานที่ยังค้าง (TODO)
 - [ ] **RLS** — แยกข้อมูล `main_4_listing_database` ตาม `created_by` (auth.uid()) → **ผู้ใช้ขอแปะไว้ก่อน** ยังไม่ทำ ต้องคุยเรื่องสิทธิ์ (ใครเห็นของใคร)
 - [ ] `main_5_lead_database.line_userid` — ตั้งใจให้ดึงจาก `main_1_hr.line_userid` ผ่าน sales_id (ยังไม่ทำ FK ตรง — เป็นค่า derived)
-- [ ] `main_1_hr.zone_sales` (Zone ของ sales) — ยังแปะเป็น text รอทำตาราง Zone assignment แยก
-- [ ] `main_3_property_detail`: `listing_name`/`project_name_eng` ใน listing ดึงจากโครงการผ่าน project_id ได้แล้ว (ยังเก็บ text คู่ไว้)
-- [ ] `main_10_potential_listing`: ตอนนี้ trigger **auto-insert เข้าอย่างเดียว ไม่ลบออก** ถ้า potential เปลี่ยนหลุดเกณฑ์ (กันข้อมูลที่ Support กรอกเองหาย) — รอเคาะว่าจะให้ลบ/ซ่อนไหม + จะเพิ่ม "หัวข้อแยก" อะไรบ้าง
+- [x] **Zone assignment**: เซล 1 คนดูแลหลายโซนได้ (1 โซน = 1 เซล) รองรับด้วย `zone.sale_id_assigned`. **ลบ `main_1_hr.zone_sales` ทิ้งแล้ว** → ใช้ view `v_sale_zones` แทน (v_sale_status ก็เปลี่ยนมาใช้คอลัมน์ `zones` derive แล้ว)
+- [x] `main_4` **ลบคอลัมน์ text** `listing_name`/`project_name_eng` แล้ว → ดึงจากโครงการผ่าน `v_main_listing` (listing_name = property_detail.project_name_thai, project_name_eng = project_name_eng)
+- [x] `main_10_potential_listing`: ทำ auto insert/update/**ลบออก**เมื่อหลุดเกณฑ์ + เก็บ log (main_11) แล้ว + คอลัมน์ตามสเปคแล้ว
+- [ ] เปลี่ยน `facebook_link` → `propertyhub_link` แล้วใน main_4 + main_10 (ถ้ามี sample/แอปที่อ้าง facebook_link ต้องอัปเดตด้วย)
+- [x] `main_10.price` auto = `asking_price` / `sale_id` auto = เซลที่ดูแลโซนของ listing (`zone.sale_id_assigned`)
 
 ## หมายเหตุ/ข้อควรระวัง
 - **Listing ID ไม่มีตัวคั่น** → ตัวย่อ Zone ห้ามเป็น "คำนำหน้า" ของอีกโซน (ปัจจุบัน 23 โซนเช็กแล้วปลอดภัย)
