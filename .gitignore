@@ -1,2 +1,5 @@
 # PDF exports (เอกสารสรุป — สร้างใหม่ได้จาก HTML เสมอ ไม่ต้องเก็บใน git)
 *.pdf
+
+# haus-crm = แอพหน้าเว็บ เป็น git repo แยกของตัวเอง (ไม่ track ใน repo นี้)
+haus-crm/
