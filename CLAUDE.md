@@ -5,7 +5,8 @@
 
 ## ภาพรวมโปรเจกต์
 ออกแบบฐานข้อมูล **Supabase (Postgres)** สำหรับธุรกิจอสังหาฯ "Haus Living Estate"
-งานทั้งหมดเป็น **ไฟล์ SQL + CSV** เอาไปรัน/import ใน Supabase เอง (ไม่มีแอป/โค้ดแอปในโปรเจกต์นี้)
+งานหลักเป็น **ไฟล์ SQL + CSV** เอาไปรัน/import ใน Supabase เอง
+มีเว็บแอป CRM (Next.js) อยู่ในโฟลเดอร์ `haus-crm/` — **เป็น git repo แยกต่างหาก + ถูก gitignore ใน repo แม่** (ดูหัวข้อ "เว็บแอป CRM + Deploy Vercel" ท้ายไฟล์)
 
 ## ไฟล์ในโปรเจกต์
 | ไฟล์ | หน้าที่ |
@@ -89,3 +90,20 @@ price_remark, unit_condition, close_type
 - `v_sale_status` กว้าง 23 คอลัมน์ (breakdown เยอะ) — ถ้าจะแยกย่อยค่อยทำ view เพิ่ม
 - sample CSV: `sale_id`/`listing_code` ถูกล้างค่าไว้ (กันชน FK เพราะ main_1_hr/listing ยังว่าง)
 - **v_support_listing ต่อยอดจาก v_main_listing** → ถ้าแก้คอลัมน์ v_main_listing เช็ก view นี้ด้วย
+
+## เว็บแอป CRM (haus-crm) + Deploy Vercel
+เว็บแอป CRM อยู่ที่โฟลเดอร์ `haus-crm/` — **Next.js 15 (App Router) + React 19 + Tailwind v4 + Supabase JS** ดึงข้อมูลจากตาราง/view ที่ออกแบบไว้มาโชว์ (แดชบอร์ด `/`, `/leads`, `/listings`, `/pipeline`)
+
+- **เป็น git repo แยก** (remote: `github.com/hauslivingestate-hash/haus-crm`) — repo แม่ gitignore โฟลเดอร์นี้ไว้ ต้อง `cd haus-crm` ก่อนทำ git ของแอป
+- **Deploy = import repo เข้า Vercel** (Hobby plan) → auto-deploy ทุกครั้งที่ push `main`. env var ตั้งใน Vercel ได้แต่ **ไม่จำเป็น** เพราะ...
+- **Supabase config ใส่เป็น fallback ในโค้ดแล้ว** ([lib/supabase.ts](haus-crm/lib/supabase.ts)) — url + publishable(anon) key ฝังไว้ (ปลอดภัย เพราะเป็น public key + RLS ป้องกัน) แอปเลยรันได้เองไม่ต้องตั้ง env. ถ้าตั้ง `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` ใน Vercel จะ override ค่า fallback
+
+### ข้อควรระวังตอน deploy (เจอมาแล้ว)
+- ⚠️ **Vercel Hobby + private repo บล็อก deploy ถ้า commit author ไม่ใช่เจ้าของบัญชี** → ต้อง commit ด้วยอีเมล `hauslivingestate@gmail.com` (ตั้ง git identity ของ repo haus-crm ไว้แล้ว: `git config user.email hauslivingestate@gmail.com`)
+- ⚠️ **ห้ามรัน `npm audit fix --force`** ในแอปนี้ → มันจะ downgrade Next.js กลับ 9.x พังทั้งแอป
+- postcss ที่ audit เตือน (moderate) เป็นตัวที่ **ฝังมากับ Next.js เอง** (build-time เท่านั้น ไม่กระทบ runtime) แก้เองไม่ได้ รอ Next.js อัป
+
+### ประวัติงาน (2026-07-07)
+- อัป **Next.js 15.1.6 → 15.5.20** ปิดช่องโหว่ CVE-2025-66478
+- แก้ปัญหา Vercel บล็อก deploy (commit author) → ตั้ง git identity เป็น hauslivingestate@gmail.com
+- แก้ server-side crash (env var หายบน Vercel) → ใส่ Supabase config fallback ในโค้ด (build + รันจริงผ่าน `/`, `/listings` = 200)
