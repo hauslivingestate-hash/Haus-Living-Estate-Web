@@ -118,6 +118,7 @@ price_remark, unit_condition, close_type
 - **UI เสร็จหมด แต่ยังไม่ต่อของจริง**: ไม่มี auth (หน้า `/login` เป็นดีไซน์), ทุก state เก็บใน React Provider (refresh แล้วหาย), ทุกปุ่ม save เป็น stub, อ่านจริงจาก Supabase แค่ `v_main_listing` / `main_6_buyer_crm` / `v_sale_status`
 - **RBAC ใน `lib/rbac.ts` = สเปกที่ RLS ต้องทำตาม** แต่ตอนนี้แค่ซ่อนเมนูฝั่ง browser ยังไม่ป้องกันอะไรจริง
 - **ลำดับงาน**: identity bridge (`auth.uid()` ↔ `main_1_hr.employee_code`) → auth → import จาก Google Sheets (ครั้งเดียว ไม่มี two-way sync) → write path ทีละหน้า → RLS
+- **การตัดสินใจเรื่อง auth (Ben, 2026-08-03)**: login ด้วย **อีเมลส่วนตัว** (`main_1_hr.email` ไม่ใช่ `work_email`) และ **Admin ตั้งรหัสผ่านให้ user ได้** → ต้องมี server route ที่เรียก Supabase Admin API ด้วย `service_role` key (เก็บฝั่ง server เท่านั้น ห้าม `NEXT_PUBLIC_`) แล้ว gate ด้วย `people.manage`
 - **เป็น git repo แยก** (remote: `github.com/hauslivingestate-hash/haus-crm`) — repo แม่ gitignore โฟลเดอร์นี้ไว้ ต้อง `cd haus-crm` ก่อนทำ git ของแอป
 - **Deploy = import repo เข้า Vercel** (Hobby plan) → auto-deploy ทุกครั้งที่ push `main`. env var ตั้งใน Vercel ได้แต่ **ไม่จำเป็น** เพราะ...
 - **Supabase config ใส่เป็น fallback ในโค้ดแล้ว** ([lib/supabase.ts](haus-crm/lib/supabase.ts)) — url + publishable(anon) key ฝังไว้ (ปลอดภัย เพราะเป็น public key + RLS ป้องกัน) แอปเลยรันได้เองไม่ต้องตั้ง env. ถ้าตั้ง `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` ใน Vercel จะ override ค่า fallback
