@@ -210,8 +210,20 @@ create table main_1_hr (
   remark          text,  kbank_account text,
   line_userid     text,                    -- << main_5_lead_database ดึงไปใช้
   payslip_drive   text,
+  -- สะพาน Auth <-> พนักงาน: ทุก RLS policy วิ่งผ่านตรงนี้ (auth.uid() -> employee_code)
+  -- null = ยังไม่มีบัญชี login (เช่น พนักงานที่ลาออกแล้ว)
+  auth_user_id    uuid unique references auth.users (id) on delete set null,
   created_at      timestamptz default now()
 );
+
+-- helper: session ปัจจุบัน -> employee_code
+-- security definer เพราะตอนเปิด RLS จริง policy ต้องอ่าน main_1_hr ได้ก่อน policy จะทำงาน
+create or replace function current_employee_code()
+returns text language sql stable security definer set search_path = public as $$
+  select employee_code from main_1_hr where auth_user_id = auth.uid()
+$$;
+revoke execute on function current_employee_code() from public;
+grant  execute on function current_employee_code() to authenticated;
 
 create or replace function set_hr_employee_code()
 returns trigger language plpgsql as $$
