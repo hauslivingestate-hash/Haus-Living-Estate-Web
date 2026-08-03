@@ -189,7 +189,9 @@ insert into listing_potential (name) values
 
 -- แท็กกลุ่มลูกค้า (main_6_buyer_crm.tag_id) — CEO กำหนดรายการ, 1 ลีดติดได้ 1 แท็ก
 -- ⚠️ ข้อยกเว้นเดียวจาก convention "lookup ใช้ name เป็น PK": ตารางนี้ใช้ id
---    เพราะ CEO เปลี่ยนชื่อ/สีแท็กได้ ถ้าใช้ชื่อเป็น PK พอเปลี่ยนชื่อ ลีดเดิมจะหลุดแท็กทันที
+--    เหตุผล: แอปเขียนรอไว้แล้วด้วย id (lib/tags.ts -> LeadTag {id,label,tone}, ค่า
+--    investor/own_stay/rent_out/foreigner) + ตารางนี้ไม่ใช่ lookup แท้ (มี tone/sort_order/is_active)
+--    หมายเหตุ: ที่ใช้ชื่อเป็น PK ไม่ได้พังตอนเปลี่ยนชื่อ เพราะ FK ทุกตัวใช้ on update cascade อยู่แล้ว
 -- ลบแท็ก: ใช้ is_active = false แทน delete (ลีดเก่าจะได้ไม่กลายเป็นแท็กผี)
 create table lead_tags_ref (
   id         text primary key,
