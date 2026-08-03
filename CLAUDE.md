@@ -94,12 +94,19 @@ price_remark, unit_condition, close_type
   - เพิ่ม role **`system_admin`** (ทุกสิทธิ์) แยกจาก `ceo` ตั้งใจ — `ceo` เป็นตำแหน่งจริงของ Stone ถ้าเอาไปให้บัญชีแอดมินด้วย ทุกรายงานจะนับว่ามี CEO 2 คน
   - `E-001` เป็นแถวพนักงานปลอมสำหรับบัญชีแอดมิน (จำเป็น เพราะสิทธิ์ทุกอย่างวิ่งผ่าน `employee_code`) — `second_position` = null จึงไม่โผล่ในรายชื่อเซล
   - Pai (ลาออก) **ไม่มีบัญชี**
-- [ ] 🔑 **`NEXT_PUBLIC_AUTH_ENFORCED` ยังปิดอยู่** — พร้อมเปิดแล้ว (บัญชีครบ) แต่พอเปิดคือ **ต้อง login ถึงจะเข้าเว็บได้ทุกคน** รวมเดโมที่ CEO ดู. เปิดที่ Vercel → Environment Variables = `1` แล้ว redeploy
-- [ ] 🔴 **ยังไม่มีหน้าเปลี่ยนรหัสผ่านในแอป** — ตอนนี้รหัสตั้งโดยแอดมิน ผู้ใช้เปลี่ยนเองไม่ได้ ต้องทำก่อนใช้จริง (`supabase.auth.updateUser({password})`)
+- [x] 🔑 **เปิด auth แล้ว 2026-08-03** — `AUTH_ENFORCED` default = **เปิด** (ปิดได้ด้วย `NEXT_PUBLIC_AUTH_ENFORCED=0`). ตั้ง default ในโค้ดไม่ใช่ที่ Vercel เพราะ `NEXT_PUBLIC_*` ฝังตอน build อยู่แล้ว + โปรเจกต์นี้เคยเจอ env var หายบน host
+  - ทดสอบด้วยเบราว์เซอร์จริงแล้ว: login เป็น Q → เข้า `/` ได้ · sidebar ขึ้น "Q · Agent (Sales)" · **ไม่มีปุ่ม "ดูในมุมมอง"** (ไม่มี `roles.manage`) · เมนูเหลือเฉพาะของ agent (ไม่มี ตั้งค่า/ทีม/เว็บพอร์ทัล) · `/account` 200 · console error 0
+  - ทุกหน้ากลายเป็น **dynamic** (ทิ้ง ISR 30 วิ) เพราะ layout อ่าน session — ถูกต้องแล้ว หน้าที่ cache ให้คนนึงห้ามเสิร์ฟให้อีกคน
+- [x] **หน้าเปลี่ยนรหัสผ่าน** — `/account` ([AccountSettings](haus-crm/components/AccountSettings.tsx)) เข้าจากเมนูผู้ใช้ใน sidebar. **เช็ครหัสเดิมก่อนเปลี่ยนเสมอ** (Supabase ไม่บังคับ ทำให้คอมที่ลืม logout เปลี่ยนรหัสเจ้าของบัญชีได้)
 - [ ] **ยังไม่มีหน้าจัดการบัญชีสำหรับ Admin** — ตั้ง/รีเซ็ตรหัสให้คนอื่นต้องมี server route ที่ถือ `service_role` key (ห้าม `NEXT_PUBLIC_`) + gate ด้วย `people.manage`
 - [ ] **`lib/queries.ts` ยังใช้ anon client ที่ไม่มี session** ([lib/supabase.ts](haus-crm/lib/supabase.ts)) → ตอนทำ RLS จริงต้องย้ายไป [lib/supabase/server.ts](haus-crm/lib/supabase/server.ts) ไม่งั้นทุกหน้าที่กรองตามสิทธิ์จะว่างเปล่า **และหน้าจะกลายเป็น dynamic** (ทิ้ง ISR 30 วิ) ซึ่งถูกต้องแล้ว — หน้าที่ cache ไว้ให้คนนึงห้ามเสิร์ฟให้อีกคน
-- [ ] **`demo_read_all` = ช่องโหว่** — ทุกตารางมี policy เดียวคือให้ `anon` อ่านได้หมด และ anon key ฝังอยู่ในโค้ดหน้าเว็บ → ใครก็อ่าน `main_1_hr` (เงินเดือน/บัตร ปชช./บัญชีธนาคาร) ได้. **ห้าม import HR จริงก่อนปิดอันนี้**
-  - **ตัดสินใจแล้ว (Ben, 2026-08-03): ปิดพร้อมตอน auth เสร็จ ไม่ปิดก่อน** (เพราะเดโมที่ CEO ดูจะพัง และตอนนี้ยังเป็นข้อมูลปลอม) → **ต้องเตือน Ben ทุกครั้งที่เริ่มงาน auth**
+- [x] **ปิดรูรั่วเงินเดือน/PII แล้ว 2026-08-03** — RLS กรองได้แค่ "แถว" กรอง "คอลัมน์" ไม่ได้ จึงใช้ **GRANT ระดับคอลัมน์**: ถอน `select` ทั้งตารางจาก `anon`+`authenticated` แล้ว grant กลับเฉพาะคอลัมน์ที่ไม่อ่อนไหว
+  - **ไม่ให้ใครแตะผ่าน API เลย**: `salary` `commission` `id_card_no` `kbank_account` `payslip_drive` `agreement_files`
+  - ดูได้ทางเดียวคือ view **`v_employee_private`** ที่เช็ค `has_perm()` ทีละคอลัมน์ (ไม่มีสิทธิ์ = ได้ `null`) · anon เข้าไม่ได้เลย
+  - ⚠️ view นี้**ตั้งใจไม่ใส่ `security_invoker`** (ต่างจาก view อื่นทั้งโปรเจกต์) เพราะต้องรันด้วยสิทธิ์เจ้าของถึงจะอ่านคอลัมน์ที่เพิ่งถอนสิทธิ์ได้
+  - ทดสอบแล้ว: anon ขอ `salary` → 42501 permission denied · anon ขอ `select=*` → denied · Admin เห็นเงินเดือน · agent (Q) เห็นเป็น null
+- [ ] **`demo_read_all` ยังเปิดอยู่กับตารางที่เหลือ** — anon key ฝังในหน้าเว็บ → ตารางอื่นยังอ่านได้หมดโดยไม่ต้อง login. **การบังคับ login ไม่ได้กันตรงนี้** ต้องเขียน RLS จริงทีละตาราง (Phase 4)
+  - ติดอยู่ที่ `lib/queries.ts` ยังยิงด้วย anon client → ถ้าถอน anon ตอนนี้หน้าเว็บพังหมด ต้องย้ายไป `lib/supabase/server.ts` ก่อน
 - [ ] **ไม่มี policy INSERT/UPDATE/DELETE เลยสักตาราง** → พอต่อ write path จะโดน 403 ทุกจุด ต้องเขียน policy คู่กันไปเสมอ
 - [x] **17 คอลัมน์จากชีท Listings** — เพิ่มแล้ว 2026-08-03 (`main_4` 47 → **64 คอลัมน์**, `v_main_listing` 55 → **72**): `dd_boost` `lv_boost` `fb_repost` `marketing_report` `facebook_ad_link` `new_photo_link` `hook` `photo_album_link` `link` `last_match` `last_match_type` `last_match_price` `last_match_remark` `common_fee_rate`+`common_fee_unit`+`common_fee_note` `built_year`
   - **ส่วนกลางเก็บเป็นเรต** (`per_wa_month`/`per_sqm_month`) ไม่ใช่ยอดรวม — ชีทปน 3 หน่วย ต้องแปลงตอน import + เก็บข้อความดิบไว้ใน `common_fee_note`
