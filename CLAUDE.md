@@ -83,6 +83,25 @@ price_remark, unit_condition, close_type
 
 ## งานที่ยังค้าง (TODO)
 
+### ✅ Import ข้อมูลจริงเสร็จแล้ว (2026-08-03) — สคริปต์: [import/run_import.py](import/run_import.py)
+| ตาราง | แถว | หมายเหตุ |
+|---|---|---|
+| main_3_property_detail | 308 | Project ID มาจากชีทครบ |
+| main_2_owner | 452 | ยุบซ้ำด้วย (ชื่อ+เบอร์) |
+| main_4_listing_database | 511 | ผูกโครงการได้ 489 · มีเซลดูแลครบ 511 · มีเจ้าของ 465 |
+| main_6_buyer_crm | 953 | ผูกทรัพย์ได้ 882 |
+| main_7_last_match | 56 | ข้ามแถว Test 3 |
+| activities | 2,334 | ข้าม 26 แถวที่ Action กรอกเป็นข้อความมั่ว |
+| main_10_potential_listing | 210 | trigger สร้างเองจาก potential |
+
+**ชีทมีปัญหา "กรอกผิดช่อง" 2 จุด — ต้องรู้ก่อนแก้อะไรต่อ:**
+- **buyer_focus เหลื่อม 1 ช่องทั้งชีท** (คอลัมน์ 2–7): หัวเขียน `Admin Remark|Potential|Lead Status|สนใจ|Lead Name|Phone` แต่ข้อมูลจริงคือ `Potential|Lead Status|สนใจ|Lead Name|Phone|Admin Remark` → สคริปต์จับคู่ใหม่ตามความหมาย (ยืนยัน 953/953)
+- **listings**: `ทิศ/ตำแหน่ง/อายุ/ส่วนกลาง` กรอกเลื่อนกันเกือบทั้งชีท (ตำแหน่งเก็บค่าทิศ 347 แถว · ส่วนกลางเก็บค่าตำแหน่ง 421 แถว) → **Ben สั่งให้เอาเฉพาะค่าที่อยู่ถูกช่องจริง** (ทิศ 58 · ตำแหน่ง 37 · อายุ 53 · ส่วนกลาง 57) ที่เหลือปล่อยว่าง รอกรอกใหม่ในเว็บ
+
+**อย่างอื่นที่ทำระหว่าง import:** จับคู่โครงการด้วย**ชื่อไทย** (ชีททรัพย์ใส่ชื่อไทยในช่อง "Project Name (Eng)" จับด้วยอังกฤษได้ 1/508) · `hook` เอามาจาก `Buyer Persona` · Listing ID ซ้ำ 2 ตัวขยับเลข (HKAL058→060, LRP2036→037) · เพิ่มโซน `PKD` (Pak-kred) · เพิ่มกิจกรรม Owner Talk/Update Price/เซ็นสัญญา · `Visit→Owner Visit`, `Showing→Show`, `Closing→Close` · **`dd_boost/lv_boost/fb_repost` เปลี่ยนเป็น boolean** (ชีทเป็น TRUE/FALSE ไม่ใช่วันที่)
+
+⚠️ **เอกสารเดิม (DATA_MODEL.md) ประเมินขนาดข้อมูลต่ำไปมาก** — บอก 109 ทรัพย์/176 ลีด/39 โครงการ/289 actions แต่ของจริง 511/953/308/2360 และ `Created By` **ไม่ได้เป็น Stone ทั้งหมด** (กระจายครบ 6 คน) อย่าเชื่อตัวเลขในเอกสารนั้น
+
 ### 🔴 ที่เจอตอนรับช่วงต่อ (เช็ค DB จริงแล้ว 2026-08-03)
 - [x] **สะพาน `auth.uid()` → `employee_code`** — ทำแล้ว 2026-08-03: `main_1_hr.auth_user_id` (uuid unique → auth.users) + function `current_employee_code()` (security definer). ยังไม่มีผลจนกว่าจะมีบัญชี login. ยังขาด helper อีก 2 ตัวที่ต้องทำตอนทำ RLS: `has_perm()`, `visible_employee_codes()` (own/team/all)
 - [x] **RBAC ย้ายเข้า DB แล้ว** 2026-08-03 — `permissions` (35) · `roles` (7) · `role_permissions` · `user_roles` · `teams` + `main_1_hr.team_id`. seed ตรงกับ `SEED_ROLES` ใน [lib/rbac.ts](haus-crm/lib/rbac.ts) เป๊ะ (ceo 35 · agent 13 · listing_support 15 · marketing 7 · sales_leader 17 · admin 8 · hr 7)
