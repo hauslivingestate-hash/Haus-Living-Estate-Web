@@ -69,6 +69,19 @@ drop table if exists role_permissions cascade;
 drop table if exists roles            cascade;
 drop table if exists permissions      cascade;
 drop table if exists teams            cascade;
+-- ตารางที่เว็บแอปใช้
+drop table if exists audit_log          cascade;
+drop table if exists notifications      cascade;
+drop table if exists leave_requests     cascade;
+drop table if exists leave_allowances   cascade;
+drop table if exists leave_type         cascade;
+drop table if exists contact_roles      cascade;
+drop table if exists contacts           cascade;
+drop table if exists user_quick_actions cascade;
+drop table if exists activities         cascade;
+drop table if exists tasks              cascade;
+drop table if exists targets            cascade;
+drop table if exists action_type        cascade;
 
 
 -- ============================================================
@@ -878,6 +891,214 @@ create trigger trg_sync_potential_listing
 
 
 -- ============================================================
+-- 9.3) ตารางที่เว็บแอปต้องใช้  (เพิ่ม 2026-08-03)
+-- โครงตรงกับ type ใน haus-crm/lib/{actions,momentum,contacts,leave,notifications}.ts
+-- ทุกตารางอ้างพนักงานด้วย employee_code (แอปใช้ชื่อเล่น — map ตอน import)
+-- ============================================================
+
+-- ---- catalog กิจกรรม (ตรงกับ ACTION_GROUPS) ----
+-- attach = ผูกกับอะไรได้: lead / listing / either / none
+create table action_type (
+  name        text primary key,
+  group_label text not null,
+  attach      text not null default 'none' check (attach in ('lead','listing','either','none')),
+  sort_order  integer default 0,
+  is_active   boolean default true
+);
+insert into action_type (name, group_label, attach, sort_order) values
+  ('Call','ไปป์ไลน์ (ลูกค้า)','lead',10),
+  ('Follow','ไปป์ไลน์ (ลูกค้า)','lead',11),
+  ('Appoint','ไปป์ไลน์ (ลูกค้า)','lead',12),
+  ('Show','ไปป์ไลน์ (ลูกค้า)','lead',13),
+  ('Nego','ไปป์ไลน์ (ลูกค้า)','lead',14),
+  ('Close','ไปป์ไลน์ (ลูกค้า)','lead',15),
+  ('Win','ไปป์ไลน์ (ลูกค้า)','lead',16),
+  ('Owner Visit','งานทรัพย์','listing',20),
+  ('Survey','งานทรัพย์','listing',21),
+  ('ประเมิน','งานทรัพย์','listing',22),
+  ('New List','งานทรัพย์','listing',23),
+  ('ถ่ายรูป','งานทรัพย์','listing',24),
+  ('Reels','งานทรัพย์','listing',25),
+  ('ติดป้าย','งานทรัพย์','listing',26),
+  ('โอน','งานทรัพย์','listing',27),
+  ('ประชุม','ทั่วไป','none',30),
+  ('ทำงานหน้าคอม','ทั่วไป','none',31),
+  ('Sourcing','ทั่วไป','none',32),
+  ('อื่นๆ','ทั่วไป','none',33),
+  ('บันทึก','บันทึกโน้ต','either',40);
+-- ⚠️ ชีท Actions มี 23 ค่าที่เขียนไม่ตรงกัน (Show/Showing, Reels/ถ่าย Reels) ต้อง map เข้าชุดนี้ตอน import
+
+-- ---- เป้าหมายรายเดือน ----
+create table targets (
+  id             bigint generated always as identity primary key,
+  employee_code  text not null references main_1_hr (employee_code) on update cascade on delete cascade,
+  month          text not null,                    -- 'YYYY-MM'
+  label          text not null,
+  kind           text not null default 'count' check (kind in ('count','baht','check','ratio')),
+  target         numeric not null default 0,
+  -- source=activity คำนวณสดจาก activities (ไม่ใช้ manual_current)
+  -- kind=ratio: manual_current = ตัวเศษ, denominator = ตัวส่วน
+  manual_current numeric default 0,
+  denominator    numeric,
+  source         text not null default 'manual' check (source in ('activity','pipeline','manual','kpi')),
+  activity_type  text references action_type (name) on update cascade,
+  owner          text not null default 'stretch' check (owner in ('official','stretch')),
+  -- จังหวะโฟกัสรายสัปดาห์ (Owner Talk=wk1, Sourcing/Survey=wk2-3, Buyer Follow=wk4)
+  focus_week_start integer, focus_week_end integer, focus_label text,
+  created_at timestamptz default now(), updated_at timestamptz default now()
+);
+create index idx_targets_emp_month on targets (employee_code, month);
+
+-- ---- แผนวันนี้ ----
+-- ติ๊กงานที่ผูก activity_type = เขียน activities (write path เดียวของกิจกรรม หลังเอา FAB ออก)
+create table tasks (
+  id            bigint generated always as identity primary key,
+  employee_code text not null references main_1_hr (employee_code) on update cascade on delete cascade,
+  task_date     date not null,
+  title         text not null,
+  done          boolean default false,
+  sort_order    integer default 0,
+  task_type     text not null default 'work' check (task_type in ('build','work','personal')),
+  notes         text,
+  target_id     bigint references targets (id) on delete set null,
+  activity_type text references action_type (name) on update cascade,
+  related_lead_id    text references main_6_buyer_crm (lead_id)          on update cascade on delete set null,
+  related_listing_id text references main_4_listing_database (listing_id) on update cascade on delete set null,
+  start_time time, end_time time,
+  repeat_freq text check (repeat_freq is null or repeat_freq in ('none','daily','weekdays','weekly','monthly')),
+  repeat_weekdays integer[], repeat_day_of_month integer,
+  created_at timestamptz default now(), updated_at timestamptz default now()
+);
+create index idx_tasks_emp_date on tasks (employee_code, task_date);
+
+-- ---- บันทึกกิจกรรม (input ของ KPI · ladder เซลใหม่ · timeline · leaderboard) ----
+create table activities (
+  id             bigint generated always as identity primary key,
+  employee_code  text not null references main_1_hr (employee_code) on update cascade on delete cascade,
+  action         text not null references action_type (name) on update cascade,
+  activity_date  date not null,   -- วันของ "งาน" ไม่ใช่วันที่กด (ติ๊กย้อนหลังต้องลงวันนั้น)
+  count          integer not null default 1 check (count > 0),
+  remark         text,
+  related_lead_id    text references main_6_buyer_crm (lead_id)          on update cascade on delete set null,
+  related_listing_id text references main_4_listing_database (listing_id) on update cascade on delete set null,
+  -- unique: ติ๊กงานเดิมซ้ำต้องไม่นับซ้ำ / ยกเลิกติ๊กแล้วแถวนี้หายไปด้วย
+  task_id        bigint unique references tasks (id) on delete cascade,
+  created_at     timestamptz default now()
+);
+create index idx_activities_emp_date on activities (employee_code, activity_date);
+create index idx_activities_lead     on activities (related_lead_id);
+create index idx_activities_listing  on activities (related_listing_id);
+
+-- ---- ปุ่มลัดเพิ่มงานรายคน (เดิมอยู่ localStorage) ----
+create table user_quick_actions (
+  id            bigint generated always as identity primary key,
+  employee_code text not null references main_1_hr (employee_code) on update cascade on delete cascade,
+  label         text not null,
+  task_type     text not null default 'work' check (task_type in ('build','work','personal')),
+  activity_type text references action_type (name) on update cascade,
+  sort_order    integer default 0
+);
+create index idx_quick_actions_emp on user_quick_actions (employee_code);
+
+-- ---- ผู้ติดต่อ ----
+-- created_by / assigned_to = กติกาความเป็นส่วนตัว (เซลเห็นของตัวเอง เว้นมี contacts.view_all)
+-- ทรัพย์ที่ถือ + ความต้องการ ไม่เก็บที่นี่ — derive จาก main_4/main_6
+-- ⚠️ ตอน import ต้อง dedupe กับ main_2_owner ด้วยเบอร์โทร
+create table contacts (
+  id          bigint generated always as identity primary key,
+  name        text not null,
+  phone       text, line_id text, email text, note text,
+  created_by  text references main_1_hr (employee_code) on update cascade on delete set null,
+  assigned_to text references main_1_hr (employee_code) on update cascade on delete set null,
+  created_at  timestamptz default now(), updated_at timestamptz default now()
+);
+create index idx_contacts_phone   on contacts (phone);
+create index idx_contacts_created on contacts (created_by);
+
+-- 1 คนเป็นได้หลายบทบาท (เจ้าของหลังนึง + ผู้ซื้ออีกหลัง)
+create table contact_roles (
+  contact_id bigint not null references contacts (id) on delete cascade,
+  role       text not null check (role in ('owner','buyer','tenant','landlord')),
+  primary key (contact_id, role)
+);
+
+-- ---- วันลา ----
+create table leave_type (name text primary key);
+insert into leave_type (name) values
+  ('ลาพักร้อน'),('ลากิจ'),('ลาป่วย'),('ลาคลอด'),('ลาเพื่อทำหมัน'),('อื่นๆ');
+
+-- โควตาระดับบริษัท (ยังไม่มี override รายคน)
+-- ⚠️ ตัวเลขชุดนี้เป็น "ขั้นต่ำตามกฎหมาย" ไม่ใช่นโยบายบริษัท — ชีทไม่มีคอลัมน์โควตา
+--    หลักฐานว่าผิด: เทียบ 6 วัน/ปี มีพนักงาน 5 จาก 8 คนใช้เกินแล้วในปี 2026 (Golf 17, Pup 10)
+--    ต้องขอตัวเลขจริงจาก HR ก่อนใช้งาน
+create table leave_allowances (
+  type          text primary key references leave_type (name) on update cascade,
+  days_per_year integer,          -- null = ไม่นับโควตาปี (ลาคลอด/ทำหมัน)
+  note          text
+);
+insert into leave_allowances (type, days_per_year, note) values
+  ('ลาพักร้อน', 6,  'ขั้นต่ำตามกฎหมาย — ยืนยันกับ HR'),
+  ('ลากิจ',     3,  'ขั้นต่ำตามกฎหมาย — ยืนยันกับ HR'),
+  ('ลาป่วย',    30, 'สูงสุดที่ได้รับค่าจ้าง'),
+  ('ลาคลอด',    null, 'ตามกฎหมาย ไม่นับโควตาปี'),
+  ('ลาเพื่อทำหมัน', null, 'ตามที่แพทย์กำหนด'),
+  ('อื่นๆ',     null, 'ไม่นับโควตา');
+
+-- ชีทต้นทางไม่มีคอลัมน์อนุมัติเลย — CRM เพิ่มขั้นตอนนี้ใหม่ (Ben, 2026-08-01)
+-- โควตาหักเฉพาะ approved (ใบที่รออนุมัติต้องไม่กินโควตาไปก่อน)
+create table leave_requests (
+  id            bigint generated always as identity primary key,
+  employee_code text not null references main_1_hr (employee_code) on update cascade on delete cascade,
+  submitted_at  timestamptz default now(),
+  start_date    date not null,
+  end_date      date not null,
+  type          text not null references leave_type (name) on update cascade,
+  remark        text,
+  status        text not null default 'pending' check (status in ('pending','approved','rejected')),
+  decided_by    text references main_1_hr (employee_code) on update cascade on delete set null,
+  decided_at    timestamptz,
+  created_at    timestamptz default now(),
+  -- ชีทมีแถววันเริ่มอยู่หลังวันสิ้นสุด (Golf 09/10 -> 20/06) กันไม่ให้เข้ามาอีก
+  constraint leave_date_order check (start_date <= end_date)
+);
+-- ชีทมีแถวซ้ำเป๊ะ 2 แถว (Golf ลาเพื่อทำหมัน 14/08) — กันนับซ้ำตั้งแต่ import
+create unique index uq_leave_dedupe on leave_requests (employee_code, start_date, end_date, type);
+create index idx_leave_emp on leave_requests (employee_code);
+
+-- ---- แจ้งเตือน ----
+-- ไม่มี permission gate: ทุกคนมีกระดิ่ง การกรองแถว (RLS) คือความปลอดภัยทั้งหมด
+-- ⚠️ body ของ deal_won มีมูลค่าดีล ถ้า scope ผิด = หลุดตัวเลขเงินที่ financials.view_comp กันไว้
+-- ข้อความเก็บเป็นข้อความสำเร็จรูป (ไม่ใช่ template) — แก้คำทีหลังไม่ย้อนไปแถวเก่า
+create table notifications (
+  id            bigint generated always as identity primary key,
+  employee_code text not null references main_1_hr (employee_code) on update cascade on delete cascade,
+  type          text not null check (type in (
+                  'lead_assigned','lead_stage_changed','deal_won','task_due',
+                  'target_milestone','listing_new_in_zone','listing_price_changed')),
+  title         text not null,
+  body          text,
+  entity        text check (entity is null or entity in ('lead','listing','task','target')),
+  entity_id     text,
+  actor         text,          -- ชื่อเล่นคนที่ทำให้เกิด (ว่าง = ระบบสร้างเอง)
+  created_at    timestamptz default now(),
+  read_at       timestamptz    -- null = ยังไม่อ่าน
+);
+create index idx_notifications_emp on notifications (employee_code, created_at desc);
+
+-- ---- audit ----
+create table audit_log (
+  id          bigint generated always as identity primary key,
+  entity      text not null,      -- 'lead' | 'listing' | 'employee' | ...
+  entity_id   text not null,
+  action      text not null,      -- 'assign' | 'update' | 'delete' | ...
+  changed_by  text references main_1_hr (employee_code) on update cascade on delete set null,
+  before jsonb, after jsonb, remark text,
+  created_at  timestamptz default now()
+);
+create index idx_audit_entity on audit_log (entity, entity_id, created_at desc);
+
+
+-- ============================================================
 -- 10) VIEW: v_main_listing (Owner phone/line + Zone name + Days on Market)
 -- security_invoker = true -> view เคารพสิทธิ์/RLS ของคนที่เรียก (ไม่ใช่ของ superuser)
 -- ============================================================
@@ -1060,7 +1281,7 @@ group by h.employee_code, h.nickname;
 -- ⛔ ห้าม import ข้อมูล HR จริงก่อนปิด (เงินเดือน/เลขบัตร ปชช./เลขบัญชี จะเปิดสาธารณะ)
 
 -- ============================================================
--- เสร็จแล้ว — 42 ตาราง + 4 view + 5 function, FK เชื่อมครบ
+-- เสร็จแล้ว — 54 ตาราง + 4 view + 5 function, FK เชื่อมครบ
 -- ตาราง main ใส่เลขนำหน้าแล้ว: main_1_hr ... main_11_potential_listing_log (เรียงกลุ่มใน Supabase)
 -- auto ID: employee_code / listing_id / lead_id / project_id / last_match_id
 -- Support: v_support_listing (view คิวงาน) + main_9_support_log + main_10_potential_listing (auto+กรอกเอง)

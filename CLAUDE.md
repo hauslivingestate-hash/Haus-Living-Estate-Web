@@ -103,7 +103,11 @@ price_remark, unit_condition, close_type
   - แอปเรียก `source` = คอลัมน์ `marketing_channel` (ตั้งชื่อให้ตรง main_5 ทั้ง DB)
 - [ ] **`zone`**: ตัดสินใจแล้วว่า**ไม่เพิ่ม** `sales_sheet`/`location`/วันที่ จากชีท HR. แต่ชีทมี ~30 โซน DB มี 23 → import แล้วต้องเช็คกฎ "ตัวย่อโซนห้ามเป็นคำนำหน้าของอีกโซน" ใหม่ (เพราะ `zone_id` ประกอบเป็น listing_id)
 - [ ] ⚠️ **`db/supabase_full_setup.sql` ไม่มีคำสั่ง RLS/policy** — DB จริงเปิด RLS + `demo_read_all` ไว้ แต่รันจากที่อื่น. รันไฟล์ซ้ำบน project เปล่าจะได้ตาราง **RLS ปิด = anon เขียนได้** (แย่กว่าเดิม) → มีสคริปต์ปิดท้ายไฟล์ให้รันตามแล้ว
-- [ ] **ตารางที่แอปต้องใช้แต่ยังไม่มี ~14 ตัว**: `activities`, `tasks`, `targets`, `contacts`, `leave_requests`, `leave_allowances`, `teams`/`team_members`, `roles`/`role_permissions`/`user_roles`, `notifications`, `lead_tags_ref`, `user_quick_actions`, `audit_log`, `summary_*` (rollup แดชบอร์ด)
+- [x] **ตารางที่แอปต้องใช้ — สร้างครบแล้ว 2026-08-03** (รวมทั้ง DB **54 ตาราง**): `action_type` (seed 20 กิจกรรม) · `activities` · `tasks` · `targets` · `user_quick_actions` · `contacts` + `contact_roles` · `leave_type` + `leave_allowances` + `leave_requests` · `notifications` · `audit_log` (+ RBAC/teams/lead_tags_ref ที่ทำก่อนหน้า)
+  - `activities.task_id` **unique** → ติ๊กงานซ้ำไม่นับซ้ำ, ยกเลิกติ๊กแล้วแถวหายตาม
+  - `leave_requests` มี check `start_date <= end_date` + unique (employee,start,end,type) → กัน error 2 อย่างที่มีอยู่ในชีท
+  - `contacts` ไม่เก็บทรัพย์ที่ถือ/ความต้องการ (derive จาก main_4/main_6) — ตอน import ต้อง dedupe กับ `main_2_owner` ด้วยเบอร์โทร
+- [ ] **ยังไม่ได้ทำ**: `summary_*` (rollup แดชบอร์ด — ต้องมีข้อมูลจริงก่อน) · checklist ทรัพย์ · เทมเพลตคำโฆษณา · ladder เซลใหม่ (3 อันหลังเป็น feature แยก มีเอกสารของตัวเองใน `haus-crm/*_FEATURE.md`)
 - [ ] **`main_1_hr` มี 6 แถว แต่ทีมจริง ~10 คน** — ต้อง import HR ก่อนทุกอย่าง เพราะ FK ทั้งระบบวิ่งเข้า `employee_code`
 
 ### เดิม
