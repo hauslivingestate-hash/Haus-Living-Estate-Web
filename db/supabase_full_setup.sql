@@ -62,6 +62,7 @@ drop table if exists price_remark cascade;
 drop table if exists unit_condition cascade;
 drop table if exists close_type cascade;
 drop table if exists listing_potential cascade;
+drop table if exists lead_tags_ref cascade;
 
 
 -- ============================================================
@@ -185,6 +186,27 @@ insert into close_type (name) values
 create table listing_potential (name text primary key);
 insert into listing_potential (name) values
   ('Normal'), ('A List'), ('A List + Fb add'), ('Exclusive'), ('Exclusive A');
+
+-- แท็กกลุ่มลูกค้า (main_6_buyer_crm.tag_id) — CEO กำหนดรายการ, 1 ลีดติดได้ 1 แท็ก
+-- ⚠️ ข้อยกเว้นเดียวจาก convention "lookup ใช้ name เป็น PK": ตารางนี้ใช้ id
+--    เพราะ CEO เปลี่ยนชื่อ/สีแท็กได้ ถ้าใช้ชื่อเป็น PK พอเปลี่ยนชื่อ ลีดเดิมจะหลุดแท็กทันที
+-- ลบแท็ก: ใช้ is_active = false แทน delete (ลีดเก่าจะได้ไม่กลายเป็นแท็กผี)
+create table lead_tags_ref (
+  id         text primary key,
+  label      text not null,
+  tone       text not null default 'neutral'
+             check (tone in ('accent','blue','violet','amber','green','neutral')),
+  sort_order integer default 0,
+  is_active  boolean default true,
+  created_at timestamptz default now()
+);
+-- seed ชั่วคราว รอ CEO ตั้งจริงที่ ตั้งค่า > แท็ก Lead
+-- เป็นแกน "ลูกค้าประเภทไหน" ไม่ใช่ร้อน/อุ่น/เย็น (ความร้อนใช้ potential A/B/C อยู่แล้ว)
+insert into lead_tags_ref (id, label, tone, sort_order) values
+  ('investor',  'นักลงทุน',   'violet', 1),
+  ('own_stay',  'ซื้ออยู่เอง', 'green',  2),
+  ('rent_out',  'ปล่อยเช่า',   'blue',   3),
+  ('foreigner', 'ต่างชาติ',    'amber',  4);
 
 
 -- ============================================================
@@ -343,6 +365,23 @@ create table main_4_listing_database (
   unit_condition     text references unit_condition (name) on update cascade,
   created_by         uuid default auth.uid(),  -- << RLS (แยกไฟล์)
   shorts_reels_link text, hometour_link text,
+
+  -- ==== 17 คอลัมน์จากชีท Listings (เพิ่ม 2026-08-03) ====
+  -- งานการตลาด (CEO ขอ)
+  dd_boost date, lv_boost date, fb_repost date,
+  marketing_report text, facebook_ad_link text, new_photo_link text,
+  -- ลิงก์/ข้อมูลที่ตกหล่น
+  hook text, photo_album_link text, link text,
+  -- Last Match ที่ผูกกับทรัพย์หลังนี้ (คนละอันกับตาราง main_7_last_match)
+  last_match text, last_match_type text, last_match_price numeric, last_match_remark text,
+  -- ส่วนกลาง: เก็บเป็น "เรต" เพราะชีทปน 3 หน่วย (45 บาท/ตร.ว./เดือน · 44,000/ปี · เดือนละ 2,024)
+  -- ยอดรวมให้เว็บคูณพื้นที่เอาเอง / common_fee_note เก็บข้อความดิบกันข้อมูลหาย
+  common_fee_rate numeric,
+  common_fee_unit text check (common_fee_unit is null or common_fee_unit in ('per_wa_month','per_sqm_month')),
+  common_fee_note text,
+  -- อายุ -> เก็บ "ปีที่สร้าง" (ค.ศ.) อายุคำนวณตอนแสดงผล ไม่งั้นข้อมูลผิดเองทุกปี
+  built_year int check (built_year is null or built_year between 1900 and 2200),
+
   updated_at timestamptz default now(),
   created_at timestamptz default now()
 );
@@ -444,6 +483,23 @@ create table main_6_buyer_crm (
   last_follow_date date, activity_comment text, commission numeric,
   closing_date date, transfer_date date, case_closing_remark text,
   complete boolean default false, confirm boolean default false,
+
+  -- ==== คอลัมน์ intake ที่ฟอร์มเก็บอยู่แล้ว (เพิ่ม 2026-08-03) ====
+  -- เก็บตรงนี้ ไม่ดึงจาก main_5 ผ่าน view เพราะ lead_ref ว่างทุกแถว + main_6 เป็นข้อมูลที่เซลแก้ได้
+  -- (main_5 = บันทึกตอนรับลีด ไม่ควรถูกทับ) — ชื่อคอลัมน์ตั้งให้ตรงกับ main_5 ทั้งหมด
+  tag_id                  text references lead_tags_ref (id)        on update cascade,  -- แอปเรียก tag
+  marketing_channel       text references marketing_channel (name)  on update cascade,  -- แอปเรียก source
+  marketing_channel_other text,
+  contact_by              text references contact_by (name)         on update cascade,
+  gender                  text references gender (name)             on update cascade,
+  nationality             text references nationality (name)        on update cascade,
+  contact_date date, contact_time time,
+  customer_complain       text,
+  complain_status         text references complain_status (name)    on update cascade,
+  complain_remark         text,
+  -- หมายเหตุ: ไม่มี recheck_status — "เซลติดต่อลูกค้าแล้วยัง" derive จาก pipeline_stage
+  -- (สเตจไหนก็ตามที่เลย 'Lead' = ติดต่อแล้ว) เก็บเป็นคอลัมน์จะกลายเป็นข้อมูล 2 ชุดที่ขัดกันเอง
+
   created_at timestamptz default now()
 );
 
@@ -799,11 +855,30 @@ group by h.employee_code, h.nickname;
 
 
 -- ============================================================
--- เสร็จแล้ว — 36 ตาราง + 4 view + 1 function (fn_sale_status), FK เชื่อมครบ
+-- ⚠️ RLS ไม่ได้อยู่ในไฟล์นี้ — อ่านก่อนรันซ้ำ
+-- ============================================================
+-- DB จริงตอนนี้ "เปิด RLS + มี policy demo_read_all (ให้ anon อ่านทุกแถว)" ทุกตาราง
+-- แต่คำสั่งพวกนั้น "ไม่ได้อยู่ในไฟล์นี้" (ถูกรันแยกไว้)
+--
+-- แปลว่าถ้ารันไฟล์นี้ซ้ำบน project เปล่า จะได้ตารางที่ RLS ปิด = anon เขียนได้ด้วย
+-- (แย่กว่า demo_read_all ที่อ่านได้อย่างเดียว) ต้องรันคำสั่งนี้ตามหลังทุกครั้ง:
+--
+--   do $$ declare t record; begin
+--     for t in select tablename from pg_tables where schemaname='public' loop
+--       execute format('alter table %I enable row level security', t.tablename);
+--       execute format('drop policy if exists demo_read_all on %I', t.tablename);
+--       execute format('create policy demo_read_all on %I for select to anon, authenticated using (true)', t.tablename);
+--     end loop; end $$;
+--
+-- demo_read_all เป็นของชั่วคราวสำหรับเดโม — ตกลงกันว่า "ปิดพร้อมตอน auth เสร็จ" (Ben, 2026-08-03)
+-- ⛔ ห้าม import ข้อมูล HR จริงก่อนปิด (เงินเดือน/เลขบัตร ปชช./เลขบัญชี จะเปิดสาธารณะ)
+
+-- ============================================================
+-- เสร็จแล้ว — 37 ตาราง + 4 view + 2 function (fn_sale_status, current_employee_code), FK เชื่อมครบ
 -- ตาราง main ใส่เลขนำหน้าแล้ว: main_1_hr ... main_11_potential_listing_log (เรียงกลุ่มใน Supabase)
 -- auto ID: employee_code / listing_id / lead_id / project_id / last_match_id
 -- Support: v_support_listing (view คิวงาน) + main_9_support_log + main_10_potential_listing (auto+กรอกเอง)
--- ยังค้าง: RLS (แยกข้อมูล listing ตาม created_by) — ทำแยกไฟล์
--- Import ตัวอย่าง: main_6_buyer_crm <- buyer_crm_sample.csv ,
---                  main_5_lead_database <- lead_database_sample.csv
+-- Auth: main_1_hr.auth_user_id + current_employee_code() = สะพานที่ RLS ทุกตัวจะใช้
+-- Import ตัวอย่าง: main_6_buyer_crm <- samples/buyer_crm_sample.csv ,
+--                  main_5_lead_database <- samples/lead_database_sample.csv
 -- ============================================================

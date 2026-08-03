@@ -84,12 +84,21 @@ price_remark, unit_condition, close_type
 ## งานที่ยังค้าง (TODO)
 
 ### 🔴 ที่เจอตอนรับช่วงต่อ (เช็ค DB จริงแล้ว 2026-08-03)
-- [ ] **ไม่มีสะพาน `auth.uid()` → `employee_code`** — `auth.users` = 0 คน, `main_1_hr` ไม่มีคอลัมน์ auth user id, `main_4.created_by` เป็น **uuid** และ NULL ทุกแถว. ต้องเพิ่ม `main_1_hr.auth_user_id uuid unique references auth.users(id)` + SQL helper (`current_employee_code()`, `has_perm()`, `visible_employee_codes()`) **ก่อนทำ RLS ทุกข้อ** — `main_9_support_log.support_id` ค้างอยู่เพราะเรื่องเดียวกัน
+- [x] **สะพาน `auth.uid()` → `employee_code`** — ทำแล้ว 2026-08-03: `main_1_hr.auth_user_id` (uuid unique → auth.users) + function `current_employee_code()` (security definer). ยังไม่มีผลจนกว่าจะมีบัญชี login. ยังขาด helper อีก 2 ตัวที่ต้องทำตอนทำ RLS: `has_perm()`, `visible_employee_codes()` (own/team/all)
+- [ ] **`auth.users` = 0 คน** — ยังไม่มีบัญชีสักคน. ตกลงแล้วว่า login ด้วย**อีเมลส่วนตัว** (`main_1_hr.email`) และ **Admin ตั้งรหัสให้ได้** → ต้องมี server route ที่ถือ `service_role` key + gate ด้วย `people.manage`
 - [ ] **`demo_read_all` = ช่องโหว่** — ทุกตารางมี policy เดียวคือให้ `anon` อ่านได้หมด และ anon key ฝังอยู่ในโค้ดหน้าเว็บ → ใครก็อ่าน `main_1_hr` (เงินเดือน/บัตร ปชช./บัญชีธนาคาร) ได้. **ห้าม import HR จริงก่อนปิดอันนี้**
   - **ตัดสินใจแล้ว (Ben, 2026-08-03): ปิดพร้อมตอน auth เสร็จ ไม่ปิดก่อน** (เพราะเดโมที่ CEO ดูจะพัง และตอนนี้ยังเป็นข้อมูลปลอม) → **ต้องเตือน Ben ทุกครั้งที่เริ่มงาน auth**
 - [ ] **ไม่มี policy INSERT/UPDATE/DELETE เลยสักตาราง** → พอต่อ write path จะโดน 403 ทุกจุด ต้องเขียน policy คู่กันไปเสมอ
-- [ ] **15 คอลัมน์ที่ชีทมีแต่ DB ไม่มี — ไม่ได้อยู่ใน base table ด้วย** (เช็คแล้ว `main_4` มี 47 คอลัมน์, `v_main_listing` 55 = ส่วนต่างเป็น derived) → ต้อง `alter table` เพิ่มจริง ไม่ใช่แค่แก้ view: `hook`, `common_fee_rate`+`common_fee_unit`+`common_fee_note` (ส่วนกลาง — เก็บเป็น**เรต** ไม่ใช่ยอดรวม), `built_year` (อายุ — เก็บ**ปีที่สร้าง** ไม่ใช่จำนวนปี), `photo_album_link`, `link`, `last_match_price/remark/type`, `new_photo_link`, `facebook_ad_link`, `dd_boost`, `lv_boost`, `fb_repost`, `marketing_report`. **ต้องเพิ่มก่อน import** เพราะ import ทำครั้งเดียว
-- [ ] **`main_6_buyer_crm` ขาดคอลัมน์ intake ที่ LeadForm เก็บ**: `tag_id`, `source` (marketing channel), `contact_by`, `gender`, `nationality`, `contact_date`/`contact_time`, `recheck_status`, complaint fields
+- [x] **17 คอลัมน์จากชีท Listings** — เพิ่มแล้ว 2026-08-03 (`main_4` 47 → **64 คอลัมน์**, `v_main_listing` 55 → **72**): `dd_boost` `lv_boost` `fb_repost` `marketing_report` `facebook_ad_link` `new_photo_link` `hook` `photo_album_link` `link` `last_match` `last_match_type` `last_match_price` `last_match_remark` `common_fee_rate`+`common_fee_unit`+`common_fee_note` `built_year`
+  - **ส่วนกลางเก็บเป็นเรต** (`per_wa_month`/`per_sqm_month`) ไม่ใช่ยอดรวม — ชีทปน 3 หน่วย ต้องแปลงตอน import + เก็บข้อความดิบไว้ใน `common_fee_note`
+  - **`built_year` = ปี ค.ศ. ที่สร้าง** ไม่ใช่จำนวนปี — ฟอร์มกรอกทรัพย์ต้องเปลี่ยนคำถามเป็น "สร้างปีไหน"
+  - `last_match_type` ยังไม่ทำ FK → `close_type` รอดูค่าจริงในชีทก่อน (กัน import ล้ม)
+- [x] **คอลัมน์ intake ของ `main_6_buyer_crm`** — เพิ่มแล้ว 2026-08-03 (26 → **37 คอลัมน์**) + ตารางใหม่ `lead_tags_ref` (seed 4 แท็ก รอ CEO ตั้งจริง): `tag_id` `marketing_channel`+`marketing_channel_other` `contact_by` `gender` `nationality` `contact_date`/`contact_time` `customer_complain`/`complain_status`/`complain_remark`
+  - **เลือกเก็บตรง ๆ ไม่ดึงจาก main_5 ผ่าน view** เพราะ `lead_ref` ว่าง 10/10 แถว + main_5 = บันทึกตอนรับลีด (ไม่ควรถูกเซลแก้ทับ)
+  - **ไม่มี `recheck_status`** — derive จาก `pipeline_stage` (เลย 'Lead' = ติดต่อแล้ว) เก็บเป็นคอลัมน์จะได้ข้อมูล 2 ชุดที่ขัดกันเอง
+  - แอปเรียก `source` = คอลัมน์ `marketing_channel` (ตั้งชื่อให้ตรง main_5 ทั้ง DB)
+- [ ] **`zone`**: ตัดสินใจแล้วว่า**ไม่เพิ่ม** `sales_sheet`/`location`/วันที่ จากชีท HR. แต่ชีทมี ~30 โซน DB มี 23 → import แล้วต้องเช็คกฎ "ตัวย่อโซนห้ามเป็นคำนำหน้าของอีกโซน" ใหม่ (เพราะ `zone_id` ประกอบเป็น listing_id)
+- [ ] ⚠️ **`db/supabase_full_setup.sql` ไม่มีคำสั่ง RLS/policy** — DB จริงเปิด RLS + `demo_read_all` ไว้ แต่รันจากที่อื่น. รันไฟล์ซ้ำบน project เปล่าจะได้ตาราง **RLS ปิด = anon เขียนได้** (แย่กว่าเดิม) → มีสคริปต์ปิดท้ายไฟล์ให้รันตามแล้ว
 - [ ] **ตารางที่แอปต้องใช้แต่ยังไม่มี ~14 ตัว**: `activities`, `tasks`, `targets`, `contacts`, `leave_requests`, `leave_allowances`, `teams`/`team_members`, `roles`/`role_permissions`/`user_roles`, `notifications`, `lead_tags_ref`, `user_quick_actions`, `audit_log`, `summary_*` (rollup แดชบอร์ด)
 - [ ] **`main_1_hr` มี 6 แถว แต่ทีมจริง ~10 คน** — ต้อง import HR ก่อนทุกอย่าง เพราะ FK ทั้งระบบวิ่งเข้า `employee_code`
 
