@@ -4,20 +4,26 @@
 > ผู้ใช้สื่อสารเป็นภาษาไทย — ตอบเป็นไทย, โค้ด/ชื่อคอลัมน์เป็นอังกฤษ
 
 ## ภาพรวมโปรเจกต์
-ออกแบบฐานข้อมูล **Supabase (Postgres)** สำหรับธุรกิจอสังหาฯ "Haus Living Estate"
-งานหลักเป็น **ไฟล์ SQL + CSV** เอาไปรัน/import ใน Supabase เอง
-มีเว็บแอป CRM (Next.js) อยู่ในโฟลเดอร์ `haus-crm/` — **เป็น git repo แยกต่างหาก + ถูก gitignore ใน repo แม่** (ดูหัวข้อ "เว็บแอป CRM + Deploy Vercel" ท้ายไฟล์)
+ฐานข้อมูล **Supabase (Postgres)** + เว็บแอป CRM (Next.js) สำหรับธุรกิจอสังหาฯ "Haus Living Estate"
+ฝั่ง DB เป็น **ไฟล์ SQL + CSV** เอาไปรัน/import ใน Supabase เอง
+เว็บแอปอยู่ใน `haus-crm/` — **เป็น git repo แยกต่างหาก + ถูก gitignore ใน repo แม่** (ดูหัวข้อ "เว็บแอป CRM" ท้ายไฟล์)
 
-## ไฟล์ในโปรเจกต์
-| ไฟล์ | หน้าที่ |
-|---|---|
-| `supabase_full_setup.sql` | **ไฟล์หลักไฟล์เดียว** — รันทีเดียวได้ครบทั้งระบบ (36 ตาราง + 3 view + 1 function) |
-| `buyer_crm_sample.csv` | ข้อมูลตัวอย่าง import เข้า `main_6_buyer_crm` |
-| `lead_database_sample.csv` | ข้อมูลตัวอย่าง import เข้า `main_5_lead_database` |
+## โครงสร้างโฟลเดอร์ (จัดใหม่ 2026-08-03)
+```
+Haus-Web-Wp.Ben/
+├── CLAUDE.md              ไฟล์นี้ — อ่านก่อนเริ่มงานทุกครั้ง
+├── db/
+│   ├── supabase_full_setup.sql   ไฟล์หลัก รันทีเดียวครบ (36 ตาราง + 4 view + 1 function)
+│   └── samples/                  CSV ตัวอย่าง (buyer_crm, lead_database)
+├── docs/                  เอกสาร/PDF (gitignore *.pdf)
+├── import/                ⬅ วาง CSV ที่ export จาก Google Sheets ไว้ที่นี่ (ยังว่าง)
+├── memory/                โน้ตความจำของโปรเจกต์
+└── haus-crm/              เว็บแอป (git repo แยก + gitignore ใน repo แม่)
+```
 
-### วิธีรัน
-1. Supabase → SQL Editor → วาง `supabase_full_setup.sql` ทั้งไฟล์ → Run (ไฟล์มี `drop ... cascade` ต้นไฟล์ รันซ้ำได้ แต่ลบข้อมูลเดิม)
-2. (ถ้าต้องการ) Table Editor → Import CSV เข้าตารางที่ตรงกัน
+### วิธีรัน SQL
+1. Supabase → SQL Editor → วาง `db/supabase_full_setup.sql` ทั้งไฟล์ → Run (ไฟล์มี `drop ... cascade` ต้นไฟล์ รันซ้ำได้ แต่ลบข้อมูลเดิม)
+2. (ถ้าต้องการ) Table Editor → Import CSV จาก `db/samples/` เข้าตารางที่ตรงกัน
 
 ## โครงสร้าง (ในไฟล์ supabase_full_setup.sql)
 **ตารางหลัก (main_N_* — ใส่เลขนำหน้าให้เรียงกลุ่มใน Supabase):**
@@ -76,6 +82,17 @@ price_remark, unit_condition, close_type
 - gender/nationality เป็น lookup ใช้ร่วมหลายตาราง
 
 ## งานที่ยังค้าง (TODO)
+
+### 🔴 ที่เจอตอนรับช่วงต่อ (เช็ค DB จริงแล้ว 2026-08-03)
+- [ ] **ไม่มีสะพาน `auth.uid()` → `employee_code`** — `auth.users` = 0 คน, `main_1_hr` ไม่มีคอลัมน์ auth user id, `main_4.created_by` เป็น **uuid** และ NULL ทุกแถว. ต้องเพิ่ม `main_1_hr.auth_user_id uuid unique references auth.users(id)` + SQL helper (`current_employee_code()`, `has_perm()`, `visible_employee_codes()`) **ก่อนทำ RLS ทุกข้อ** — `main_9_support_log.support_id` ค้างอยู่เพราะเรื่องเดียวกัน
+- [ ] **`demo_read_all` = ช่องโหว่** — ทุกตารางมี policy เดียวคือให้ `anon` อ่านได้หมด และ anon key ฝังอยู่ในโค้ดหน้าเว็บ → ใครก็อ่าน `main_1_hr` (เงินเดือน/บัตร ปชช./บัญชีธนาคาร) ได้. **ห้าม import HR จริงก่อนปิดอันนี้**
+- [ ] **ไม่มี policy INSERT/UPDATE/DELETE เลยสักตาราง** → พอต่อ write path จะโดน 403 ทุกจุด ต้องเขียน policy คู่กันไปเสมอ
+- [ ] **15 คอลัมน์ที่ชีทมีแต่ DB ไม่มี — ไม่ได้อยู่ใน base table ด้วย** (เช็คแล้ว `main_4` มี 47 คอลัมน์, `v_main_listing` 55 = ส่วนต่างเป็น derived) → ต้อง `alter table` เพิ่มจริง ไม่ใช่แค่แก้ view: `hook`, `common_fee_rate`+`common_fee_unit`+`common_fee_note` (ส่วนกลาง — เก็บเป็น**เรต** ไม่ใช่ยอดรวม), `built_year` (อายุ — เก็บ**ปีที่สร้าง** ไม่ใช่จำนวนปี), `photo_album_link`, `link`, `last_match_price/remark/type`, `new_photo_link`, `facebook_ad_link`, `dd_boost`, `lv_boost`, `fb_repost`, `marketing_report`. **ต้องเพิ่มก่อน import** เพราะ import ทำครั้งเดียว
+- [ ] **`main_6_buyer_crm` ขาดคอลัมน์ intake ที่ LeadForm เก็บ**: `tag_id`, `source` (marketing channel), `contact_by`, `gender`, `nationality`, `contact_date`/`contact_time`, `recheck_status`, complaint fields
+- [ ] **ตารางที่แอปต้องใช้แต่ยังไม่มี ~14 ตัว**: `activities`, `tasks`, `targets`, `contacts`, `leave_requests`, `leave_allowances`, `teams`/`team_members`, `roles`/`role_permissions`/`user_roles`, `notifications`, `lead_tags_ref`, `user_quick_actions`, `audit_log`, `summary_*` (rollup แดชบอร์ด)
+- [ ] **`main_1_hr` มี 6 แถว แต่ทีมจริง ~10 คน** — ต้อง import HR ก่อนทุกอย่าง เพราะ FK ทั้งระบบวิ่งเข้า `employee_code`
+
+### เดิม
 - [ ] **RLS** — แยกข้อมูล `main_4_listing_database` ตาม `created_by` (auth.uid()) → **ผู้ใช้ขอแปะไว้ก่อน** ยังไม่ทำ ต้องคุยเรื่องสิทธิ์ (ใครเห็นของใคร)
 - [ ] `main_5_lead_database.line_userid` — ตั้งใจให้ดึงจาก `main_1_hr.line_userid` ผ่าน sales_id (ยังไม่ทำ FK ตรง — เป็นค่า derived)
 - [x] **Zone assignment**: เซล 1 คนดูแลหลายโซนได้ (1 โซน = 1 เซล) รองรับด้วย `zone.sale_id_assigned`. **ลบ `main_1_hr.zone_sales` ทิ้งแล้ว** → ใช้ view `v_sale_zones` แทน (v_sale_status ก็เปลี่ยนมาใช้คอลัมน์ `zones` derive แล้ว)
@@ -92,8 +109,15 @@ price_remark, unit_condition, close_type
 - **v_support_listing ต่อยอดจาก v_main_listing** → ถ้าแก้คอลัมน์ v_main_listing เช็ก view นี้ด้วย
 
 ## เว็บแอป CRM (haus-crm) + Deploy Vercel
-เว็บแอป CRM อยู่ที่โฟลเดอร์ `haus-crm/` — **Next.js 15 (App Router) + React 19 + Tailwind v4 + Supabase JS** ดึงข้อมูลจากตาราง/view ที่ออกแบบไว้มาโชว์ (แดชบอร์ด `/`, `/leads`, `/listings`, `/pipeline`)
+เว็บแอป CRM อยู่ที่โฟลเดอร์ `haus-crm/` — **Next.js 15 (App Router) + React 19 + Tailwind v4 + Supabase JS**
 
+### สถานะ: รับช่วงต่อจากเฟสออกแบบ (2026-08-03)
+แอปเวอร์ชันเก่า (5 หน้า) **ถูกทับด้วยเวอร์ชัน design-first เต็ม (23 routes) แล้ว** — ของเก่ายังกู้ได้จาก git tag **`v1-legacy`**
+
+- **เอกสารส่งมอบอยู่ในโฟลเดอร์แอป** อ่านตามลำดับนี้: [DATA_MODEL.md](haus-crm/DATA_MODEL.md) (บล็อก HANDOVER บนสุด) → [HANDOVER_CHECKLIST.md](haus-crm/HANDOVER_CHECKLIST.md) → [CEO_FEEDBACK_R1.md](haus-crm/CEO_FEEDBACK_R1.md)
+- **UI เสร็จหมด แต่ยังไม่ต่อของจริง**: ไม่มี auth (หน้า `/login` เป็นดีไซน์), ทุก state เก็บใน React Provider (refresh แล้วหาย), ทุกปุ่ม save เป็น stub, อ่านจริงจาก Supabase แค่ `v_main_listing` / `main_6_buyer_crm` / `v_sale_status`
+- **RBAC ใน `lib/rbac.ts` = สเปกที่ RLS ต้องทำตาม** แต่ตอนนี้แค่ซ่อนเมนูฝั่ง browser ยังไม่ป้องกันอะไรจริง
+- **ลำดับงาน**: identity bridge (`auth.uid()` ↔ `main_1_hr.employee_code`) → auth → import จาก Google Sheets (ครั้งเดียว ไม่มี two-way sync) → write path ทีละหน้า → RLS
 - **เป็น git repo แยก** (remote: `github.com/hauslivingestate-hash/haus-crm`) — repo แม่ gitignore โฟลเดอร์นี้ไว้ ต้อง `cd haus-crm` ก่อนทำ git ของแอป
 - **Deploy = import repo เข้า Vercel** (Hobby plan) → auto-deploy ทุกครั้งที่ push `main`. env var ตั้งใน Vercel ได้แต่ **ไม่จำเป็น** เพราะ...
 - **Supabase config ใส่เป็น fallback ในโค้ดแล้ว** ([lib/supabase.ts](haus-crm/lib/supabase.ts)) — url + publishable(anon) key ฝังไว้ (ปลอดภัย เพราะเป็น public key + RLS ป้องกัน) แอปเลยรันได้เองไม่ต้องตั้ง env. ถ้าตั้ง `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` ใน Vercel จะ override ค่า fallback
@@ -101,7 +125,12 @@ price_remark, unit_condition, close_type
 ### ข้อควรระวังตอน deploy (เจอมาแล้ว)
 - ⚠️ **Vercel Hobby + private repo บล็อก deploy ถ้า commit author ไม่ใช่เจ้าของบัญชี** → ต้อง commit ด้วยอีเมล `hauslivingestate@gmail.com` (ตั้ง git identity ของ repo haus-crm ไว้แล้ว: `git config user.email hauslivingestate@gmail.com`)
 - ⚠️ **ห้ามรัน `npm audit fix --force`** ในแอปนี้ → มันจะ downgrade Next.js กลับ 9.x พังทั้งแอป
-- postcss ที่ audit เตือน (moderate) เป็นตัวที่ **ฝังมากับ Next.js เอง** (build-time เท่านั้น ไม่กระทบ runtime) แก้เองไม่ได้ รอ Next.js อัป
+- `npm audit` เตือน 3 high (next / postcss / sharp) — เป็นของที่ **ฝังมากับ Next.js เอง** (build-time) แก้เองไม่ได้ รอ Next.js อัป
+
+### ประวัติงาน (2026-08-03) — รับช่วงต่อ
+- ทับ `haus-crm/` ด้วยแอปเวอร์ชัน design-first เต็ม (23 routes) — ของเก่าอยู่ที่ git tag `v1-legacy`
+- จัดโฟลเดอร์แม่ใหม่: `db/`, `db/samples/`, `docs/`, `import/`
+- เช็คสคีมาจริงบน Supabase → บันทึกไว้ในหัวข้อ TODO 🔴 ด้านบน
 
 ### ประวัติงาน (2026-07-07)
 - อัป **Next.js 15.1.6 → 15.5.20** ปิดช่องโหว่ CVE-2025-66478
