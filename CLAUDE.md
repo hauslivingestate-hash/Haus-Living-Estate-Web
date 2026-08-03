@@ -88,7 +88,15 @@ price_remark, unit_condition, close_type
 - [x] **RBAC ย้ายเข้า DB แล้ว** 2026-08-03 — `permissions` (35) · `roles` (7) · `role_permissions` · `user_roles` · `teams` + `main_1_hr.team_id`. seed ตรงกับ `SEED_ROLES` ใน [lib/rbac.ts](haus-crm/lib/rbac.ts) เป๊ะ (ceo 35 · agent 13 · listing_support 15 · marketing 7 · sales_leader 17 · admin 8 · hr 7)
 - [x] **helper ครบแล้ว**: `current_employee_code()` · `my_permissions()` · `has_perm(text)` · `visible_employee_codes()` (own/team/all) — ทุกตัว `security definer` + grant เฉพาะ `authenticated`
 - [x] **ต่อ auth ในแอปแล้ว** — `@supabase/ssr` + [middleware.ts](haus-crm/middleware.ts) (refresh session + กัน route) + [LoginForm](haus-crm/components/LoginForm.tsx) ใช้ `signInWithPassword` จริง + ปุ่มออกจากระบบใน Sidebar + `RbacProvider` รับ session
-- [ ] 🔑 **`auth.users` = 0 คน → ตอนนี้ `NEXT_PUBLIC_AUTH_ENFORCED` ปิดอยู่** (เดโมยังเข้าได้โดยไม่ต้อง login). **เปิดสวิตช์นี้หลังจาก**: import `main_1_hr` → สร้างบัญชี → เติม `auth_user_id` → ใส่ `user_roles`. ตกลงแล้วว่า login ด้วย**อีเมลส่วนตัว** (`main_1_hr.email`) และ **Admin ตั้งรหัสให้ได้** → ต้องมี server route ที่ถือ `service_role` key + gate ด้วย `people.manage`
+- [x] **สร้างบัญชี login แล้ว 2026-08-03 — 9 บัญชี** (พนักงาน Active 8 + `E-001` Admin). ทดสอบแล้วทั้งสาย: login → `current_employee_code()` → `my_permissions()` → `visible_employee_codes()` ถูกต้องทุกคน
+  - สร้างผ่าน SQL (`auth.users` + `auth.identities`) เพราะไม่มี service_role key ในเครื่อง
+  - ⚠️ **กับดัก:** GoTrue อ่าน `confirmation_token`/`recovery_token`/`email_change_token_new`/`email_change` เป็น string ธรรมดา ถ้าเป็น NULL จะ login ไม่ได้ ขึ้น `Database error querying schema` — 4 คอลัมน์นี้**ไม่มี default** ต้องใส่ `''` เอง (ถ้าสร้างบัญชีเพิ่มในอนาคตต้องระวัง)
+  - เพิ่ม role **`system_admin`** (ทุกสิทธิ์) แยกจาก `ceo` ตั้งใจ — `ceo` เป็นตำแหน่งจริงของ Stone ถ้าเอาไปให้บัญชีแอดมินด้วย ทุกรายงานจะนับว่ามี CEO 2 คน
+  - `E-001` เป็นแถวพนักงานปลอมสำหรับบัญชีแอดมิน (จำเป็น เพราะสิทธิ์ทุกอย่างวิ่งผ่าน `employee_code`) — `second_position` = null จึงไม่โผล่ในรายชื่อเซล
+  - Pai (ลาออก) **ไม่มีบัญชี**
+- [ ] 🔑 **`NEXT_PUBLIC_AUTH_ENFORCED` ยังปิดอยู่** — พร้อมเปิดแล้ว (บัญชีครบ) แต่พอเปิดคือ **ต้อง login ถึงจะเข้าเว็บได้ทุกคน** รวมเดโมที่ CEO ดู. เปิดที่ Vercel → Environment Variables = `1` แล้ว redeploy
+- [ ] 🔴 **ยังไม่มีหน้าเปลี่ยนรหัสผ่านในแอป** — ตอนนี้รหัสตั้งโดยแอดมิน ผู้ใช้เปลี่ยนเองไม่ได้ ต้องทำก่อนใช้จริง (`supabase.auth.updateUser({password})`)
+- [ ] **ยังไม่มีหน้าจัดการบัญชีสำหรับ Admin** — ตั้ง/รีเซ็ตรหัสให้คนอื่นต้องมี server route ที่ถือ `service_role` key (ห้าม `NEXT_PUBLIC_`) + gate ด้วย `people.manage`
 - [ ] **`lib/queries.ts` ยังใช้ anon client ที่ไม่มี session** ([lib/supabase.ts](haus-crm/lib/supabase.ts)) → ตอนทำ RLS จริงต้องย้ายไป [lib/supabase/server.ts](haus-crm/lib/supabase/server.ts) ไม่งั้นทุกหน้าที่กรองตามสิทธิ์จะว่างเปล่า **และหน้าจะกลายเป็น dynamic** (ทิ้ง ISR 30 วิ) ซึ่งถูกต้องแล้ว — หน้าที่ cache ไว้ให้คนนึงห้ามเสิร์ฟให้อีกคน
 - [ ] **`demo_read_all` = ช่องโหว่** — ทุกตารางมี policy เดียวคือให้ `anon` อ่านได้หมด และ anon key ฝังอยู่ในโค้ดหน้าเว็บ → ใครก็อ่าน `main_1_hr` (เงินเดือน/บัตร ปชช./บัญชีธนาคาร) ได้. **ห้าม import HR จริงก่อนปิดอันนี้**
   - **ตัดสินใจแล้ว (Ben, 2026-08-03): ปิดพร้อมตอน auth เสร็จ ไม่ปิดก่อน** (เพราะเดโมที่ CEO ดูจะพัง และตอนนี้ยังเป็นข้อมูลปลอม) → **ต้องเตือน Ben ทุกครั้งที่เริ่มงาน auth**
