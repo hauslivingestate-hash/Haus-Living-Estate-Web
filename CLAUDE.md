@@ -115,6 +115,39 @@ price_remark, unit_condition, close_type
 - `main_11_potential_listing_log` — ไม่ทำ FK (เก็บประวัติแม้ listing ถูกลบ)
 - gender/nationality เป็น lookup ใช้ร่วมหลายตาราง
 
+## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-03 ปลายวัน)
+
+### 🔴 บั๊กเปิดค้าง: หน้า `/leads` ขึ้น "Application error: a client-side exception has occurred"
+Ben เจอตอนกดเมนู **Lead** บน production (`haus-crm-iota.vercel.app/leads`) — จอขาว ไม่มี sidebar
+**ยังไม่ได้แก้ ยังไม่รู้สาเหตุ** ผมจำลองไม่สำเร็จเลยสักครั้ง
+
+**ตัดออกไปแล้ว (อย่าเสียเวลาลองซ้ำ):**
+- ไม่ใช่ข้อมูลว่าง — 0 แถวก็เรนเดอร์ปกติ (server 200, console error 0)
+- ไม่ใช่ข้อมูล null — ยัด row ที่ `lead_name`/`phone`/`pipeline_stage`/`lead_status`/`lead_type`/`sale_id` เป็น null ครบก็ไม่พัง
+- ไม่ใช่ dev-only — build production แล้ว `next start` ก็ไม่พัง
+- ไม่ใช่เรื่องสิทธิ์/ตัวตน — จำลอง session ระดับ agent (ชื่อที่ไม่มีใน `SEED_USERS`) แล้ว sidebar ขึ้น "Q · Agent (Sales)" ถูกต้อง ไม่พัง
+- ไม่ใช่ provider หาย — provider ทุกตัวใน `app/(app)/layout.tsx` mount แบบไม่มีเงื่อนไข
+- โค้ดที่รับข้อมูลใน `LeadsBrowser` null-safe หมด (`Avatar` `GradeChip` `stageMeta` `leadStatusDot` `findTag`)
+- เช็ค null ใน `main_6_buyer_crm` จริงทั้ง 953 แถว — ไม่มีอะไรผิดรูปพอจะทำให้พัง
+
+**สมมติฐานที่เหลือ (เรียงตามน่าจะเป็น):**
+1. **chunk ค้างจาก deploy เก่า** — แท็บ Ben เปิดค้างระหว่างที่ deploy ไป 3 รอบ พอกด client-side nav ไป `/leads` เบราว์เซอร์ขอไฟล์ JS ของ build ที่ถูกลบแล้ว → 404 → error ตัวนี้เป๊ะ **วิธีพิสูจน์: Ctrl+Shift+R ถ้าหาย = ไม่ใช่บั๊ก**
+2. ถ้ายังพัง → ต้องได้ **console error จริง** (F12 → Console) หรืออ่าน Vercel runtime error
+
+**⚠️ Vercel MCP token หมดอายุ** ระหว่างเซสชัน → อ่าน `get_runtime_errors` / `get_runtime_logs` ไม่ได้ ต้องต่อใหม่ใน `/mcp` ก่อน
+
+**วิธีจำลอง production ในเครื่อง (ใช้ซ้ำได้ เร็วดี):** patch ชั่วคราว 2 จุด แล้วรันด้วย env
+- `app/(app)/layout.tsx` → ให้ `auth` มาจาก `process.env.FAKE_SESSION` (คอมมาคั่น permission)
+- `lib/queries.ts` → `getCrm()` คืน array ปลอมเมื่อ `FAKE_CRM=1`
+- `NEXT_PUBLIC_AUTH_ENFORCED=0` (ปิด middleware) แล้วยิงด้วย skill `browser-automation` เพื่อดู console error
+- ⚠️ **patch พวกนี้ revert แล้ว** อย่าเผลอ commit ถ้าทำใหม่
+
+### 🟡 ค้างจากรอบนี้ (ไม่เร่ง)
+- **role `marketing` ยังแก้ราคาทรัพย์ได้** — RLS กรองแถวไม่ได้กรองคอลัมน์ ต้องทำ RPC เฉพาะคอลัมน์การตลาด
+- **`v_sale_status` เป็น security_invoker** → เซลเห็นเลขตัวเอง คนอื่นเป็น 0 ถ้า Ben อยากได้กระดานผลงานทั้งทีมต้องทำ view แยกแบบ security definer
+- **หน้า "ทรัพย์" จะว่างสำหรับ Marketing/Admin/HR** (ไม่ได้ดูแลทรัพย์เอง) — ตั้งใจตามดีไซน์ แต่ถ้า support อยากเห็นทั้งหมดในหน้าแรกด้วย แก้ที่ `getMyListings()` บรรทัดเดียว
+- ยังไม่มีหน้าจัดการบัญชีสำหรับ Admin (ต้องมี server route ถือ `service_role` + gate ด้วย `people.manage`)
+
 ## งานที่ยังค้าง (TODO)
 
 ### ✅ Import ข้อมูลจริงเสร็จแล้ว (2026-08-03) — สคริปต์: [import/run_import.py](import/run_import.py)
@@ -196,6 +229,9 @@ price_remark, unit_condition, close_type
 ### เดิม
 - [ ] **RLS** — แยกข้อมูล `main_4_listing_database` ตาม `created_by` (auth.uid()) → **ผู้ใช้ขอแปะไว้ก่อน** ยังไม่ทำ ต้องคุยเรื่องสิทธิ์ (ใครเห็นของใคร)
 - [ ] `main_5_lead_database.line_userid` — ตั้งใจให้ดึงจาก `main_1_hr.line_userid` ผ่าน sales_id (ยังไม่ทำ FK ตรง — เป็นค่า derived)
+- [x] **ขอบเขตหน้าทรัพย์ — Ben ตัดสินใจ 2026-08-03**: หน้า **"ทรัพย์" = เฉพาะที่ตัวเองดูแล** (`effective_sale_id`) · หน้า **"ทรัพย์ทั้งบริษัท" = ทุกแถว แต่เบอร์/ไลน์เจ้าของถูกตัดที่ RLS** (ไม่ใช่แค่ไม่โชว์คอลัมน์ — เดิมข้อมูลถึงเบราว์เซอร์ + ยิง REST ได้ครบ 452 ราย)
+  - กรองหน้าแรกทำที่ **แอป (`getMyListings()`) ไม่ใช่ RLS** เพราะหน้าทรัพย์ทั้งบริษัทอ่านตารางเดียวกันและต้องเห็นครบ (มีไว้หา Co-Agent)
+  - `contacts.view_all` ยังเห็นเจ้าของครบ (support/หัวหน้า/CEO) — ทดสอบแล้ว agent 89/452 · support 452 · marketing 0 · แถวทรัพย์ 511 ครบทุกคน
 - [x] **Zone assignment — เปลี่ยนหลักคิดแล้ว 2026-08-03 (Ben)**: **"ทรัพย์" เป็นตัวตัดสินว่าใครดูแล** ไม่ใช่โซน → เพิ่ม `main_4_listing_database.sale_id` (เซลที่ดูแลบ้านหลังนั้น), ลีดวิ่งตามรหัสทรัพย์ที่ลูกค้าสนใจ
   - โซนจึงมีหลายเซลได้แล้ว → ตาราง `zone_sales(zone_id, employee_code, is_primary)` **แทน `zone.sale_id_assigned` ที่ลบทิ้งแล้ว** (ของจริง: พระราม 3 = Pup + Mhow)
   - `is_primary` = เจ้าภาพโซน (โซนละไม่เกิน 1 คน — บังคับด้วย partial unique index) ใช้เป็น**ค่าสำรอง** 2 กรณี: ลีดที่ไม่ระบุทรัพย์ · ทรัพย์ใหม่ที่ยังไม่ระบุเซล → helper `zone_primary_sale(zone_id)`
