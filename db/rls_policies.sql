@@ -435,3 +435,23 @@ where 'anon' = any (select rolname from pg_roles where oid = any (p.polroles));
 -- นับ policy ต่อตาราง (ดูภาพรวม — ปกติได้ 3-4 อันต่อตาราง)
 -- select c.relname, count(*) from pg_policy p join pg_class c on c.oid=p.polrelid
 -- join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' group by 1 order by 2, 1;
+
+-- ============================================================
+-- 11) เพิ่มเติม 2026-08-03 (หลัง Ben ทัก) — เบอร์เจ้าของต้องกันจริง ไม่ใช่แค่ไม่โชว์คอลัมน์
+--     หน้า "ทรัพย์ทั้งบริษัท" เขียนไว้เองว่า "ไม่แสดงข้อมูลเจ้าของ" แต่ข้อมูลถูกส่งถึง
+--     เบราว์เซอร์อยู่ดี + ยิง REST ตรงก็ได้ครบ 452 ราย → ย้ายมากันที่ RLS
+--     v_main_listing ใช้ LEFT JOIN → คนไม่มีสิทธิ์ได้ owner_* เป็น null แต่แถวทรัพย์ยังครบ
+-- ============================================================
+drop policy if exists p_select on public.main_2_owner;
+create policy p_select on public.main_2_owner for select to authenticated
+  using (
+    (select has_perm('contacts.view_all'))
+    or (select has_perm('roles.manage'))
+    or exists (
+      select 1 from public.main_4_listing_database l
+      where l.owner_id = main_2_owner.owner_id
+        and coalesce(l.sale_id, zone_primary_sale(l.zone)) = (select current_employee_code())
+    )
+  );
+create index if not exists idx_main_4_owner_id on public.main_4_listing_database (owner_id);
+create index if not exists idx_main_4_sale_id  on public.main_4_listing_database (sale_id);
