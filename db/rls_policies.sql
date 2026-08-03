@@ -1,7 +1,8 @@
 -- ============================================================
 -- HAUS LIVING ESTATE — RLS POLICIES (Phase 4)
+-- ✅ รันบน production แล้ว 2026-08-03 (ทดสอบครบทั้ง anon / agent / admin / marketing / trigger)
 -- รันไฟล์นี้ "หลัง" supabase_full_setup.sql + หลังมีตาราง RBAC (permissions/roles/user_roles)
--- รันซ้ำได้ (drop policy if exists ทุกอัน)
+-- รันซ้ำได้ (drop policy if exists ทุกอัน) — ไม่มีคำสั่งที่แตะข้อมูลสักบรรทัด
 --
 -- หลักการ
 --   1) anon (คนที่ยังไม่ล็อกอิน) = อ่านไม่ได้เลยสักตาราง  ← ปิด demo_read_all ที่เปิดค้างไว้
@@ -391,7 +392,35 @@ create policy p_insert on public.audit_log for insert to authenticated
 
 
 -- ============================================================
--- 9) ตรวจผลลัพธ์
+-- 9) ปิด endpoint /rest/v1/rpc/* ของ helper + ตรึง search_path
+--    helper อ่าน auth.uid() ซึ่ง anon ไม่มีอยู่แล้ว แต่ไม่มีเหตุผลให้เปิดทิ้งไว้ให้ยิงเล่น
+-- ============================================================
+revoke execute on function public.current_employee_code()  from anon;
+revoke execute on function public.my_permissions()         from anon;
+revoke execute on function public.has_perm(text)           from anon;
+revoke execute on function public.visible_employee_codes() from anon;
+revoke execute on function public.zone_primary_sale(text)  from anon;
+
+-- ตรึง search_path ของ trigger function (advisor 0011) — พฤติกรรมไม่เปลี่ยน
+-- แต่กันคนที่สร้าง schema ชื่อซ้ำมาแย่ง resolve ชื่อตาราง
+alter function public.set_lead_database_id()      set search_path = public;
+alter function public.set_hr_employee_code()      set search_path = public;
+alter function public.set_listing_id()            set search_path = public;
+alter function public.set_livinginsider_date()    set search_path = public;
+alter function public.set_last_match_id()         set search_path = public;
+alter function public.set_project_id()            set search_path = public;
+alter function public.set_updated_at()            set search_path = public;
+alter function public.sync_potential_listing()    set search_path = public;
+alter function public.log_listing_status_change() set search_path = public;
+alter function public.zone_primary_sale(text)     set search_path = public;
+alter function public.fn_sale_status(date, date)  set search_path = public;
+
+-- หมายเหตุ: `rls_auto_enable()` ที่ advisor เตือนว่า anon เรียกได้ — **ไม่ต้องแตะ**
+-- เป็น event trigger ของ Supabase เอง (บังคับเปิด RLS ให้ตารางที่สร้างใหม่) `returns event_trigger`
+-- จึงเรียกผ่าน REST ไม่ได้จริง
+
+-- ============================================================
+-- 10) ตรวจผลลัพธ์
 -- ============================================================
 -- ต้องได้ "0 แถว" ทั้งคู่ ถ้ามีแถวโผล่มาแปลว่ายังมีรูรั่ว
 select 'ตารางที่ยังไม่มี policy' as ปัญหา, c.relname as ตาราง

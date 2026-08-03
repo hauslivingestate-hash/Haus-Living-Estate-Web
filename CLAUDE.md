@@ -158,8 +158,13 @@ price_remark, unit_condition, close_type
   - ดูได้ทางเดียวคือ view **`v_employee_private`** ที่เช็ค `has_perm()` ทีละคอลัมน์ (ไม่มีสิทธิ์ = ได้ `null`) · anon เข้าไม่ได้เลย
   - ⚠️ view นี้**ตั้งใจไม่ใส่ `security_invoker`** (ต่างจาก view อื่นทั้งโปรเจกต์) เพราะต้องรันด้วยสิทธิ์เจ้าของถึงจะอ่านคอลัมน์ที่เพิ่งถอนสิทธิ์ได้
   - ทดสอบแล้ว: anon ขอ `salary` → 42501 permission denied · anon ขอ `select=*` → denied · Admin เห็นเงินเดือน · agent (Q) เห็นเป็น null
-- [ ] 🟡 **RLS Phase 4 — เขียนเสร็จแล้ว รอ Ben รัน**: [db/rls_policies.sql](db/rls_policies.sql) (82 policy / 54 ตาราง) — Supabase → SQL Editor → วางทั้งไฟล์ → Run (รันซ้ำได้ ท้ายไฟล์มี query ตรวจผล ต้องได้ 0 แถว)
-  - ฝั่งแอปพร้อมแล้ว (`lib/queries.ts` ย้ายไป session client + deploy แล้ว) → **รัน SQL ได้เลยไม่ต้องแก้โค้ดเพิ่ม**
+- [x] ✅ **RLS Phase 4 — รันบน production แล้ว 2026-08-03**: [db/rls_policies.sql](db/rls_policies.sql) (82 policy / 54 ตาราง) รันซ้ำได้ ท้ายไฟล์มี query ตรวจผล (ต้องได้ 0 แถว)
+  - **ลำดับที่ใช้จริง (สำคัญถ้าต้องทำซ้ำที่อื่น)**: สร้าง policy ใหม่ให้ครบทุกตารางก่อน → เช็คว่าไม่มีตารางตกหล่น → **ค่อยถอน `demo_read_all` + anon เป็นขั้นสุดท้าย** เพราะ policy เป็น permissive (OR กัน) จึงไม่มีช่วงที่แอปอ่านอะไรไม่ได้เลย
+  - **ผลทดสอบ** (จำลอง session ด้วย `set local request.jwt.claims` แล้ว rollback): anon ยิง REST ได้ `42501` ทุกตาราง/วิว/rpc · **Q (agent)** เห็นทรัพย์ 511 · ลีด **169 จาก 953** (ของตัวเองล้วน) · last match 16 · กิจกรรม 471 · ใบลา 2 · **E-001 (admin)** เห็นครบ 511/953/56/2334/20 · **Pui (marketing)** เห็นทรัพย์ 511 แต่ลีด/last match/กิจกรรม = 0
+  - **ทดสอบด้านลบผ่านหมด**: agent ฮุบลีดคนอื่น 0 แถว · ลบทรัพย์ 0 · แก้ชื่อคนอื่น 0 · ลบ A-List log 0 · เพิ่ม role ให้ตัวเอง → `42501` · เงินเดือนคนอื่นใน `v_employee_private` = null
+  - **trigger ยังทำงานใต้ RLS** — ทดสอบ agent แก้ `listing_status` + ดัน `potential` เป็น A List: support_log 511→512 · main_10 210→211 · main_11 210→211 แล้ว rollback (ยืนยันข้อมูลกลับมาเท่าเดิมครบทุกตาราง)
+  - เพิ่มเติมที่ทำพร้อมกัน: `revoke execute` helper 5 ตัวจาก anon (ปิด `/rest/v1/rpc/*`) + ตรึง `search_path` ของ trigger function 11 ตัว (advisor 0011)
+  - ⚠️ `rls_auto_enable()` ที่ advisor เตือน — **ของ Supabase เอง อย่าแตะ** (event trigger บังคับเปิด RLS ให้ตารางใหม่ เรียกผ่าน REST ไม่ได้จริง)
   - สิ่งที่ไฟล์นี้ทำ: ลบ `demo_read_all` + `admin_write` ทุกตาราง · **`revoke all ... from anon` ทุกตาราง/วิว** (ไม่ใช่แค่ปิด policy — ให้ขอมาแล้วได้ 42501 ชัด ๆ แทน `[]` เงียบ ๆ) · สร้าง select/insert/update/delete ครบทุกตารางโดยอิง `has_perm()` + `visible_employee_codes()` ตัวเดียวกับที่ UI ใช้
   - ขอบเขตที่ตั้งไว้: **ทรัพย์ = ของบริษัท** ใครมี `listings.view` เห็นหมด · **ลีด/CRM = ของใครของมัน** (`leads.view_own` → `sale_id = ตัวเอง`) · **last match** own/team/all ครบ 3 ชั้น · **แผนงาน/ปุ่มลัด/แจ้งเตือน** ส่วนตัวล้วน · `audit_log` เขียนได้ในนามตัวเอง **ไม่มี update/delete โดยตั้งใจ**
   - ⚠️ **main_9/10/11 ต้องเปิดกว้างเท่าสิทธิ์แก้ทรัพย์** เพราะ trigger (`log_listing_status_change`, `sync_potential_listing`) **ไม่ใช่ security definer** → รันด้วยสิทธิ์คนแก้ทรัพย์ ถ้า policy แคบกว่า การแก้ทรัพย์จะล้มทั้งรายการ
@@ -174,7 +179,7 @@ price_remark, unit_condition, close_type
   - **ไม่มี `recheck_status`** — derive จาก `pipeline_stage` (เลย 'Lead' = ติดต่อแล้ว) เก็บเป็นคอลัมน์จะได้ข้อมูล 2 ชุดที่ขัดกันเอง
   - แอปเรียก `source` = คอลัมน์ `marketing_channel` (ตั้งชื่อให้ตรง main_5 ทั้ง DB)
 - [ ] **`zone`**: ตัดสินใจแล้วว่า**ไม่เพิ่ม** `sales_sheet`/`location`/วันที่ จากชีท HR. แต่ชีทมี ~30 โซน DB มี 23 → import แล้วต้องเช็คกฎ "ตัวย่อโซนห้ามเป็นคำนำหน้าของอีกโซน" ใหม่ (เพราะ `zone_id` ประกอบเป็น listing_id)
-- [ ] ⚠️ **`db/supabase_full_setup.sql` ไม่มีคำสั่ง RLS/policy** — DB จริงเปิด RLS + `demo_read_all` ไว้ แต่รันจากที่อื่น. รันไฟล์ซ้ำบน project เปล่าจะได้ตาราง **RLS ปิด = anon เขียนได้** (แย่กว่าเดิม) → มีสคริปต์ปิดท้ายไฟล์ให้รันตามแล้ว
+- [ ] ⚠️ **`db/supabase_full_setup.sql` ไม่มีคำสั่ง RLS/policy** — รันไฟล์นั้นเดี่ยว ๆ บน project เปล่าจะได้ตาราง **RLS ปิด = anon เขียนได้** → **ต้องรัน [db/rls_policies.sql](db/rls_policies.sql) ตามทุกครั้ง** (ไฟล์นั้นต้องรันหลังตาราง RBAC มีข้อมูลแล้ว เพราะทุก policy อ้าง `has_perm()`)
 - [x] **ตารางที่แอปต้องใช้ — สร้างครบแล้ว 2026-08-03** (รวมทั้ง DB **54 ตาราง**): `action_type` (seed 20 กิจกรรม) · `activities` · `tasks` · `targets` · `user_quick_actions` · `contacts` + `contact_roles` · `leave_type` + `leave_allowances` + `leave_requests` · `notifications` · `audit_log` (+ RBAC/teams/lead_tags_ref ที่ทำก่อนหน้า)
   - `activities.task_id` **unique** → ติ๊กงานซ้ำไม่นับซ้ำ, ยกเลิกติ๊กแล้วแถวหายตาม
   - `leave_requests` มี check `start_date <= end_date` + unique (employee,start,end,type) → กัน error 2 อย่างที่มีอยู่ในชีท
