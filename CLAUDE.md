@@ -47,6 +47,7 @@ Haus-Web-Wp.Ben/
 ├── CLAUDE.md              ไฟล์นี้ — อ่านก่อนเริ่มงานทุกครั้ง
 ├── db/
 │   ├── supabase_full_setup.sql   ไฟล์หลัก รันทีเดียวครบ (36 ตาราง + 4 view + 1 function)
+│   ├── rls_policies.sql          RLS ทั้งระบบ (Phase 4) — รันหลัง full_setup + หลังมีตาราง RBAC
 │   └── samples/                  CSV ตัวอย่าง (buyer_crm, lead_database)
 ├── docs/                  เอกสาร/PDF (gitignore *.pdf)
 ├── import/                ⬅ วาง CSV ที่ export จาก Google Sheets ไว้ที่นี่ (ยังว่าง)
@@ -151,15 +152,19 @@ price_remark, unit_condition, close_type
   - ทุกหน้ากลายเป็น **dynamic** (ทิ้ง ISR 30 วิ) เพราะ layout อ่าน session — ถูกต้องแล้ว หน้าที่ cache ให้คนนึงห้ามเสิร์ฟให้อีกคน
 - [x] **หน้าเปลี่ยนรหัสผ่าน** — `/account` ([AccountSettings](haus-crm/components/AccountSettings.tsx)) เข้าจากเมนูผู้ใช้ใน sidebar. **เช็ครหัสเดิมก่อนเปลี่ยนเสมอ** (Supabase ไม่บังคับ ทำให้คอมที่ลืม logout เปลี่ยนรหัสเจ้าของบัญชีได้)
 - [ ] **ยังไม่มีหน้าจัดการบัญชีสำหรับ Admin** — ตั้ง/รีเซ็ตรหัสให้คนอื่นต้องมี server route ที่ถือ `service_role` key (ห้าม `NEXT_PUBLIC_`) + gate ด้วย `people.manage`
-- [ ] **`lib/queries.ts` ยังใช้ anon client ที่ไม่มี session** ([lib/supabase.ts](haus-crm/lib/supabase.ts)) → ตอนทำ RLS จริงต้องย้ายไป [lib/supabase/server.ts](haus-crm/lib/supabase/server.ts) ไม่งั้นทุกหน้าที่กรองตามสิทธิ์จะว่างเปล่า **และหน้าจะกลายเป็น dynamic** (ทิ้ง ISR 30 วิ) ซึ่งถูกต้องแล้ว — หน้าที่ cache ไว้ให้คนนึงห้ามเสิร์ฟให้อีกคน
+- [x] **ย้าย `lib/queries.ts` ไป session-aware client แล้ว 2026-08-03** ([lib/supabase/server.ts](haus-crm/lib/supabase/server.ts)) — **ลบ `lib/supabase.ts` (anon client ไร้ session) ทิ้งแล้ว** ไม่ได้แค่เลิกใช้ เพราะถ้าปล่อยไว้ call site ต่อไปที่หยิบไปใช้จะได้ผลลัพธ์ว่างเปล่าเงียบ ๆ แทนที่จะ error
 - [x] **ปิดรูรั่วเงินเดือน/PII แล้ว 2026-08-03** — RLS กรองได้แค่ "แถว" กรอง "คอลัมน์" ไม่ได้ จึงใช้ **GRANT ระดับคอลัมน์**: ถอน `select` ทั้งตารางจาก `anon`+`authenticated` แล้ว grant กลับเฉพาะคอลัมน์ที่ไม่อ่อนไหว
   - **ไม่ให้ใครแตะผ่าน API เลย**: `salary` `commission` `id_card_no` `kbank_account` `payslip_drive` `agreement_files`
   - ดูได้ทางเดียวคือ view **`v_employee_private`** ที่เช็ค `has_perm()` ทีละคอลัมน์ (ไม่มีสิทธิ์ = ได้ `null`) · anon เข้าไม่ได้เลย
   - ⚠️ view นี้**ตั้งใจไม่ใส่ `security_invoker`** (ต่างจาก view อื่นทั้งโปรเจกต์) เพราะต้องรันด้วยสิทธิ์เจ้าของถึงจะอ่านคอลัมน์ที่เพิ่งถอนสิทธิ์ได้
   - ทดสอบแล้ว: anon ขอ `salary` → 42501 permission denied · anon ขอ `select=*` → denied · Admin เห็นเงินเดือน · agent (Q) เห็นเป็น null
-- [ ] **`demo_read_all` ยังเปิดอยู่กับตารางที่เหลือ** — anon key ฝังในหน้าเว็บ → ตารางอื่นยังอ่านได้หมดโดยไม่ต้อง login. **การบังคับ login ไม่ได้กันตรงนี้** ต้องเขียน RLS จริงทีละตาราง (Phase 4)
-  - ติดอยู่ที่ `lib/queries.ts` ยังยิงด้วย anon client → ถ้าถอน anon ตอนนี้หน้าเว็บพังหมด ต้องย้ายไป `lib/supabase/server.ts` ก่อน
-- [ ] **ไม่มี policy INSERT/UPDATE/DELETE เลยสักตาราง** → พอต่อ write path จะโดน 403 ทุกจุด ต้องเขียน policy คู่กันไปเสมอ
+- [ ] 🟡 **RLS Phase 4 — เขียนเสร็จแล้ว รอ Ben รัน**: [db/rls_policies.sql](db/rls_policies.sql) (82 policy / 54 ตาราง) — Supabase → SQL Editor → วางทั้งไฟล์ → Run (รันซ้ำได้ ท้ายไฟล์มี query ตรวจผล ต้องได้ 0 แถว)
+  - ฝั่งแอปพร้อมแล้ว (`lib/queries.ts` ย้ายไป session client + deploy แล้ว) → **รัน SQL ได้เลยไม่ต้องแก้โค้ดเพิ่ม**
+  - สิ่งที่ไฟล์นี้ทำ: ลบ `demo_read_all` + `admin_write` ทุกตาราง · **`revoke all ... from anon` ทุกตาราง/วิว** (ไม่ใช่แค่ปิด policy — ให้ขอมาแล้วได้ 42501 ชัด ๆ แทน `[]` เงียบ ๆ) · สร้าง select/insert/update/delete ครบทุกตารางโดยอิง `has_perm()` + `visible_employee_codes()` ตัวเดียวกับที่ UI ใช้
+  - ขอบเขตที่ตั้งไว้: **ทรัพย์ = ของบริษัท** ใครมี `listings.view` เห็นหมด · **ลีด/CRM = ของใครของมัน** (`leads.view_own` → `sale_id = ตัวเอง`) · **last match** own/team/all ครบ 3 ชั้น · **แผนงาน/ปุ่มลัด/แจ้งเตือน** ส่วนตัวล้วน · `audit_log` เขียนได้ในนามตัวเอง **ไม่มี update/delete โดยตั้งใจ**
+  - ⚠️ **main_9/10/11 ต้องเปิดกว้างเท่าสิทธิ์แก้ทรัพย์** เพราะ trigger (`log_listing_status_change`, `sync_potential_listing`) **ไม่ใช่ security definer** → รันด้วยสิทธิ์คนแก้ทรัพย์ ถ้า policy แคบกว่า การแก้ทรัพย์จะล้มทั้งรายการ
+  - ⚠️ **ยังกัน role `marketing` แก้ราคาไม่ได้** — RLS กรองแถวไม่ได้กรองคอลัมน์ และ column grant ผูกกับ role `authenticated` ทั้งก้อน (แยกรายคนไม่ได้) ทางแก้จริงคือทำ RPC เฉพาะคอลัมน์การตลาด
+  - ⚠️ **หลังรัน `v_sale_status` จะเปลี่ยนพฤติกรรม** — เป็น `security_invoker` → เซลจะเห็นตัวเลขของตัวเองจริง คนอื่นเป็น 0 (ถูกต้องแล้ว แต่ผิดจากที่เคยเห็นก่อนหน้า)
 - [x] **17 คอลัมน์จากชีท Listings** — เพิ่มแล้ว 2026-08-03 (`main_4` 47 → **64 คอลัมน์**, `v_main_listing` 55 → **72**): `dd_boost` `lv_boost` `fb_repost` `marketing_report` `facebook_ad_link` `new_photo_link` `hook` `photo_album_link` `link` `last_match` `last_match_type` `last_match_price` `last_match_remark` `common_fee_rate`+`common_fee_unit`+`common_fee_note` `built_year`
   - **ส่วนกลางเก็บเป็นเรต** (`per_wa_month`/`per_sqm_month`) ไม่ใช่ยอดรวม — ชีทปน 3 หน่วย ต้องแปลงตอน import + เก็บข้อความดิบไว้ใน `common_fee_note`
   - **`built_year` = ปี ค.ศ. ที่สร้าง** ไม่ใช่จำนวนปี — ฟอร์มกรอกทรัพย์ต้องเปลี่ยนคำถามเป็น "สร้างปีไหน"
@@ -219,6 +224,14 @@ price_remark, unit_condition, close_type
 - **เป็น git repo แยก** (remote: `github.com/hauslivingestate-hash/haus-crm`) — repo แม่ gitignore โฟลเดอร์นี้ไว้ ต้อง `cd haus-crm` ก่อนทำ git ของแอป
 - **Deploy = import repo เข้า Vercel** (Hobby plan) → auto-deploy ทุกครั้งที่ push `main`. env var ตั้งใน Vercel ได้แต่ **ไม่จำเป็น** เพราะ...
 - **Supabase config ใส่เป็น fallback ในโค้ดแล้ว** ([lib/supabase.ts](haus-crm/lib/supabase.ts)) — url + publishable(anon) key ฝังไว้ (ปลอดภัย เพราะเป็น public key + RLS ป้องกัน) แอปเลยรันได้เองไม่ต้องตั้ง env. ถ้าตั้ง `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` ใน Vercel จะ override ค่า fallback
+
+### URL ที่ใช้จริง + Deployment Protection
+- **URL สำหรับทีม: `https://haus-crm-iota.vercel.app`** (production alias ของโปรเจกต์)
+  - ⚠️ **`haus-crm.vercel.app` ไม่ใช่ของเรา** — เป็นโปรเจกต์ของคนอื่นบน Vercel อย่าเอาไปแชร์
+  - ลิงก์ที่ก๊อปจากหน้า dashboard ของ Vercel (`haus-<hash>-...`) ใช้แชร์ไม่ได้เหมือนกัน ให้ส่ง `haus-crm-iota` เท่านั้น
+- **Vercel Authentication (SSO) = Standard Protection** เปลี่ยนแล้ว 2026-08-03 (เดิม `all_except_custom_domains` → **`preview`**)
+  - production เข้าได้โดยไม่ต้องมีบัญชี Vercel (ไปเจอหน้า login ของแอปแทน) · preview ของ branch อื่นยังถูกล็อกไว้
+  - ⚠️ **แปลว่าด่านเดียวที่กันคนนอกตอนนี้คือหน้า login ของแอป** — เดิมมี Vercel SSO บังอีกชั้น ตอนนี้ไม่มีแล้ว จึงต้องรัน `db/rls_policies.sql` ให้จบ
 
 ### ข้อควรระวังตอน deploy (เจอมาแล้ว)
 - ⚠️ **Vercel Deployment Protection เปิดอยู่** (2026-08-03) → เปิด URL แล้วเด้งไป `vercel.com/sso-api` **ตั้งแต่ก่อนถึงแอป** แม้แต่หน้า `/login` — ไม่ใช่บั๊กของเรา. ปิดที่ Settings → Deployment Protection → Vercel Authentication = Disabled (ปิดได้แล้วเพราะแอปมี login ของตัวเอง). URL ที่มี `-git-main-` เป็น deployment ของ branch ไม่ใช่ production
