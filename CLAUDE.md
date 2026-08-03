@@ -115,6 +115,46 @@ price_remark, unit_condition, close_type
 - `main_11_potential_listing_log` — ไม่ทำ FK (เก็บประวัติแม้ listing ถูกลบ)
 - gender/nationality เป็น lookup ใช้ร่วมหลายตาราง
 
+## 🗺️ แผนเฟส — เหลืออะไรบ้าง (อัปเดต 2026-08-03)
+
+ลำดับเดิมที่ตกลงไว้: **identity bridge → auth → import → RLS → write path → เชื่อมหน้าที่เหลือ**
+
+| เฟส | งาน | สถานะ |
+|---|---|---|
+| 1 | สะพาน `auth.uid()` ↔ `employee_code` + RBAC ใน DB | ✅ เสร็จ 2026-08-03 |
+| 2 | Auth จริง (login/session/บังคับ + หน้าเปลี่ยนรหัส) | ✅ เสร็จ 2026-08-03 |
+| 3 | Import จากชีท (ครั้งเดียว ไม่มี two-way sync) | ✅ เสร็จ 2026-08-03 |
+| 4 | **RLS ทั้งระบบ + ถอน anon** | ✅ เสร็จ 2026-08-03 |
+| **5** | **Write path — ต่อปุ่ม save ทุกหน้า** | 🔴 **ยังไม่เริ่ม — เฟสใหญ่สุดที่เหลือ** |
+| **6** | **เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง (~17 routes)** | 🔴 ยังไม่เริ่ม |
+| **7** | **งานแอดมิน/ops ที่ยังไม่มีที่ทำ** | 🟡 บางส่วน |
+| **8** | **ฟีเจอร์แยก (มีเอกสารของตัวเอง)** | ⬜ ยังไม่เริ่ม |
+
+### เฟส 5 — Write path (ต่อปุ่ม save) 🔴
+**ตอนนี้ทั้งแอปเป็น read-only** — อ่านจริงแค่ 7 หน้า (`/listings` `/listings/[id]` `/leads` `/leads/[id]` `/assign` `/company-listings` `/settings`) และ **ทุกปุ่มบันทึกเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย
+- ✅ **ข่าวดี: policy ฝั่ง DB พร้อมแล้ว** — เฟส 4 เขียน insert/update/delete ครบทุกตาราง ต่อ write ได้เลยไม่โดน 403
+- เรียงตามความคุ้ม: แก้ทรัพย์ (`ListingEditSheet`) → แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet`) → เพิ่มลีด (`LeadIntakeFab`) → มอบหมายลีด (`/assign`) → เพิ่มทรัพย์ (`ListingIntakeButton`) → ติ๊กงาน `/today` (เขียน `tasks` + `activities`)
+- ทุกจุดต้องเขียน `audit_log` ด้วย (`changed_by` = ตัวเอง ไม่งั้น policy ปฏิเสธ)
+- `main_6_buyer_crm.tag_id` มีคอลัมน์แล้วแต่แอปยังเก็บแท็กใน `NewLeadsProvider` — ย้ายมาเขียนจริงตอนนี้
+
+### เฟส 6 — เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง 🔴
+`/` แดชบอร์ด · `/today` แผนวันนี้ · `/contacts` · `/projects` · `/last-match` · `/team` · `/leave` · `/new-sales` · `/website` — ทั้งหมดยังอ่านจาก seed ใน `lib/*.ts`
+- **ตารางปลายทางมีครบแล้วทุกตัว** (สร้างไว้ 2026-08-03) เหลือแค่เปลี่ยน `lib/*.ts` ให้ query จริงผ่าน `lib/supabase/server.ts`
+- `/contacts` ต้อง **import + dedupe กับ `main_2_owner` ด้วยเบอร์โทร** (ตาราง `contacts` ยัง 0 แถว)
+- `/` แดชบอร์ดต้องมี `summary_*` rollup ก่อน (ยังไม่ได้ทำ)
+- `lib/zones.ts` + `ZonesAdmin` ยังเป็น 1 โซน 1 เซล ต้องแก้ให้ตรง `zone_sales` (many-to-many + `is_primary`)
+
+### เฟส 7 — แอดมิน/ops 🟡
+- **หน้าจัดการบัญชี** (ตั้ง/รีเซ็ตรหัสให้คนอื่น) — ต้องมี server route ถือ `service_role` key (ห้าม `NEXT_PUBLIC_`) + gate ด้วย `people.manage`
+- **`teams` ยังว่าง + ไม่มีใครเป็น `sales_leader`** — รอ CEO กำหนดหัวหน้าทีม (กระทบ `visible_employee_codes()` → ตอนนี้ "ทีม" = ตัวเองคนเดียว)
+- **`date_started` ว่างทุกคน** (ชีทไม่มี) — กระทบ ladder เซลใหม่ + โควตาลาปีแรก ต้องกรอกในเว็บ
+- ทิศ/ตำแหน่ง/อายุ/ส่วนกลาง ที่ import ปล่อยว่างไว้ (ชีทกรอกเลื่อนช่อง) รอกรอกใหม่ในเว็บ
+
+### เฟส 8 — ฟีเจอร์แยก (มีเอกสารของตัวเองใน `haus-crm/*_FEATURE.md`) ⬜
+checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโฆษณา · ladder เซลใหม่ (probation) · เว็บพอร์ทัลลูกค้า
+
+---
+
 ## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-03 ปลายวัน)
 
 ### 🔴 บั๊กเปิดค้าง: หน้า `/leads` ขึ้น "Application error: a client-side exception has occurred"
