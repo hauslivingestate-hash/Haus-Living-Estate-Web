@@ -69,6 +69,7 @@ drop table if exists role_permissions cascade;
 drop table if exists roles            cascade;
 drop table if exists permissions      cascade;
 drop table if exists teams            cascade;
+drop table if exists zone_sales       cascade;
 -- ตารางที่เว็บแอปใช้
 drop table if exists audit_log          cascade;
 drop table if exists notifications      cascade;
@@ -157,12 +158,13 @@ insert into property_type (name, code) values
 create table in_out_project (name text primary key);
 insert into in_out_project (name) values ('ในโครงการ'), ('นอกโครงการ');
 
+-- เซลที่ดูแลโซนไม่ได้อยู่ที่นี่ — อยู่ในตาราง zone_sales (1 โซนมีได้หลายเซล)
+-- ดูหัวข้อ 2.2 ท้าย main_1_hr
 create table zone (
   seq              bigint generated always as identity,   -- เลขรันข้างหน้า
   zone_id          text primary key,                      -- Zone ID (ตัวย่อ) ใช้ประกอบ Listing ID
   name_eng         text,
   name_thai        text,
-  sale_id_assigned text,                                  -- Sale_id_Assigned -> main_1_hr (FK เพิ่มท้ายไฟล์)
   created_at       timestamptz default now()
 );
 insert into zone (zone_id, name_eng, name_thai) values
@@ -292,9 +294,32 @@ drop trigger if exists trg_set_hr_employee_code on main_1_hr;
 create trigger trg_set_hr_employee_code before insert on main_1_hr
   for each row execute function set_hr_employee_code();
 
--- zone.sale_id_assigned -> main_1_hr (ต้องรอ main_1_hr ก่อน จึงเพิ่มตรงนี้)
-alter table zone add constraint fk_zone_sale
-  foreign key (sale_id_assigned) references main_1_hr (employee_code) on update cascade;
+-- ============================================================
+-- 2.2) zone_sales — เซลคนไหนดูแลโซนไหนบ้าง  (ต้องรอ main_1_hr ก่อน)
+--
+-- หลักคิดการมอบหมาย (Ben, 2026-08-03):
+--   "ทรัพย์" เป็นตัวตัดสินว่าใครดูแล (main_4_listing_database.sale_id)
+--   ลีดวิ่งตามรหัสทรัพย์ที่ลูกค้าสนใจ ไม่ใช่ตามโซน
+--   โซนจึงมีหลายเซลได้โดยไม่กำกวม (ของจริง: พระราม 3 = Pup + Mhow)
+--
+-- โซนยังจำเป็นเป็น "ตัวสำรอง" 2 กรณี: ลีดที่ไม่ระบุทรัพย์ · ทรัพย์ใหม่ที่ยังไม่ระบุเซล
+-- -> ธง is_primary ตอบว่าใครเป็นเจ้าภาพโซนนั้น (โซนละไม่เกิน 1 คน)
+-- ============================================================
+create table zone_sales (
+  zone_id       text not null references zone (zone_id)            on update cascade on delete cascade,
+  employee_code text not null references main_1_hr (employee_code) on update cascade on delete cascade,
+  is_primary    boolean not null default false,
+  created_at    timestamptz default now(),
+  primary key (zone_id, employee_code)
+);
+create unique index uq_zone_primary  on zone_sales (zone_id) where is_primary;
+create index        idx_zone_sales_emp on zone_sales (employee_code);
+
+-- เจ้าภาพโซน — ใช้เฉพาะตอนทรัพย์ยังไม่ระบุ sale_id
+create or replace function zone_primary_sale(p_zone text)
+returns text language sql stable as $$
+  select employee_code from zone_sales where zone_id = p_zone and is_primary limit 1
+$$;
 
 
 -- ============================================================
@@ -565,7 +590,9 @@ create table main_4_listing_database (
   price_remark       text references price_remark (name) on update cascade,
   remark text, link_location text,
   unit_condition     text references unit_condition (name) on update cascade,
-  created_by         uuid default auth.uid(),  -- << RLS (แยกไฟล์)
+  created_by         uuid default auth.uid(),  -- << RLS (แยกไฟล์) — "ใครสร้างแถว"
+  -- เซลที่ดูแลทรัพย์หลังนี้ = ตัวตัดสินว่าลีดที่สนใจทรัพย์นี้ไปหาใคร (คนละเรื่องกับ created_by)
+  sale_id            text references main_1_hr (employee_code) on update cascade on delete set null,
   shorts_reels_link text, hometour_link text,
 
   -- ==== 17 คอลัมน์จากชีท Listings (เพิ่ม 2026-08-03) ====
@@ -847,7 +874,8 @@ begin
 
   if v_tier then
     -- ดึงค่าประกอบแบบ auto
-    select sale_id_assigned  into v_sale      from zone where zone_id = new.zone;
+    -- ผู้ดูแลทรัพย์คือตัวจริง; ถ้ายังไม่ระบุค่อยใช้เจ้าภาพโซน
+    v_sale := coalesce(new.sale_id, zone_primary_sale(new.zone));
     select project_name_thai into v_proj_thai from main_3_property_detail where project_id = new.project_id;
 
     insert into main_10_potential_listing (
@@ -1114,6 +1142,8 @@ select
   z.name_thai as zone_name_thai,
   z.name_eng  as zone_name_eng,
   o.owner_name, o.owner_phone, o.owner_line,
+  -- เซลที่รับผิดชอบจริง: ของทรัพย์ก่อน ถ้าไม่มีค่อยใช้เจ้าภาพโซน
+  coalesce(l.sale_id, zone_primary_sale(l.zone)) as effective_sale_id,
   case when l.livinginsider_date is not null
        then (current_date - l.livinginsider_date) end as days_on_market
 from main_4_listing_database l
@@ -1138,7 +1168,8 @@ where listing_status in ('Ready to Post', 'Cancel', 'Update', 'Sold');
 -- ============================================================
 -- 11) VIEW: v_sale_status  (แดชบอร์ดสรุปผลงานเซลรายคน)
 -- นับ/รวมยอดของเซลแต่ละคนจากทุกตารางที่เกี่ยวข้อง
--- listing นับจากโซนที่เซลรับผิดชอบ (zone.sale_id_assigned)
+-- listing นับจาก "ทรัพย์ที่ตัวเองดูแล" (main_4.sale_id)
+-- ถ้าทรัพย์ยังไม่ระบุเซล จะ fallback ไปเจ้าภาพโซน ยอดจึงไม่หายระหว่างรอ import
 -- ============================================================
 create or replace view v_sale_status
 with (security_invoker = true) as
@@ -1148,8 +1179,8 @@ select
   h.first_name_en,
   h.last_name_en,
   h.status                              as employee_status,
-  (select string_agg(z.zone_id, ', ' order by z.zone_id)
-     from zone z where z.sale_id_assigned = h.employee_code)          as zones,
+  (select string_agg(zs.zone_id, ', ' order by zs.zone_id)
+     from zone_sales zs where zs.employee_code = h.employee_code)     as zones,
 
   -- ลีดที่ได้รับมอบหมาย (main_5_lead_database)
   (select count(*) from main_5_lead_database ld
@@ -1165,10 +1196,9 @@ select
   (select coalesce(sum(b.commission),0) from main_6_buyer_crm b
      where b.sale_id = h.employee_code)                               as total_commission,
 
-  -- listing ในโซนที่รับผิดชอบ (main_4_listing_database + zone)
+  -- ทรัพย์ที่ตัวเองดูแล (main_4.sale_id — fallback เจ้าภาพโซนถ้ายังไม่ระบุ)
   (select count(*) from main_4_listing_database l
-     join zone z on z.zone_id = l.zone
-     where z.sale_id_assigned = h.employee_code)                      as total_listings,
+     where coalesce(l.sale_id, zone_primary_sale(l.zone)) = h.employee_code) as total_listings,
 
   -- ดีลที่ปิดได้ (main_7_last_match)
   (select count(*) from main_7_last_match m
@@ -1177,16 +1207,16 @@ select
      where m.sale_id = h.employee_code)                               as total_match_value,
 
   -- ==== Listing Potential : นับ listing ของเซลแยกตาม Potential ====
-  (select count(*) from main_4_listing_database l join zone z on z.zone_id=l.zone
-     where z.sale_id_assigned=h.employee_code and l.potential='Normal')          as lst_normal,
-  (select count(*) from main_4_listing_database l join zone z on z.zone_id=l.zone
-     where z.sale_id_assigned=h.employee_code and l.potential='A List')          as lst_a_list,
-  (select count(*) from main_4_listing_database l join zone z on z.zone_id=l.zone
-     where z.sale_id_assigned=h.employee_code and l.potential='A List + Fb add') as lst_a_list_fb,
-  (select count(*) from main_4_listing_database l join zone z on z.zone_id=l.zone
-     where z.sale_id_assigned=h.employee_code and l.potential='Exclusive')       as lst_exclusive,
-  (select count(*) from main_4_listing_database l join zone z on z.zone_id=l.zone
-     where z.sale_id_assigned=h.employee_code and l.potential='Exclusive A')     as lst_exclusive_a,
+  (select count(*) from main_4_listing_database l
+     where coalesce(l.sale_id, zone_primary_sale(l.zone))=h.employee_code and l.potential='Normal')          as lst_normal,
+  (select count(*) from main_4_listing_database l
+     where coalesce(l.sale_id, zone_primary_sale(l.zone))=h.employee_code and l.potential='A List')          as lst_a_list,
+  (select count(*) from main_4_listing_database l
+     where coalesce(l.sale_id, zone_primary_sale(l.zone))=h.employee_code and l.potential='A List + Fb add') as lst_a_list_fb,
+  (select count(*) from main_4_listing_database l
+     where coalesce(l.sale_id, zone_primary_sale(l.zone))=h.employee_code and l.potential='Exclusive')       as lst_exclusive,
+  (select count(*) from main_4_listing_database l
+     where coalesce(l.sale_id, zone_primary_sale(l.zone))=h.employee_code and l.potential='Exclusive A')     as lst_exclusive_a,
 
   -- ==== CRM Potential : นับลีดใน CRM ของเซลแยกตาม Potential ====
   (select count(*) from main_6_buyer_crm b where b.sale_id=h.employee_code and b.potential='A')        as crm_a,
@@ -1256,11 +1286,14 @@ with (security_invoker = true) as
 select
   h.employee_code,
   h.nickname,
-  count(z.zone_id)                                 as zone_count,
-  string_agg(z.zone_id,   ', ' order by z.zone_id) as zone_ids,    -- เช่น "RM2, RM5, PKS"
-  string_agg(z.name_thai, ', ' order by z.zone_id) as zone_names   -- เช่น "พระราม 2, พระราม 5, เพชรเกษม"
+  count(zs.zone_id)                                  as zone_count,
+  string_agg(zs.zone_id,  ', ' order by zs.zone_id)  as zone_ids,    -- เช่น "RM2, RM5, PKS"
+  string_agg(z.name_thai, ', ' order by zs.zone_id)  as zone_names,  -- เช่น "พระราม 2, พระราม 5, เพชรเกษม"
+  -- โซนที่เป็น "เจ้าภาพ" (ลีดที่ไม่ระบุทรัพย์จะวิ่งมาหาคนนี้)
+  string_agg(zs.zone_id, ', ' order by zs.zone_id) filter (where zs.is_primary) as primary_zone_ids
 from main_1_hr h
-left join zone z on z.sale_id_assigned = h.employee_code
+left join zone_sales zs on zs.employee_code = h.employee_code
+left join zone       z  on z.zone_id = zs.zone_id
 group by h.employee_code, h.nickname;
 
 
