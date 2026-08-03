@@ -253,6 +253,9 @@ create table main_1_hr (
   remark          text,  kbank_account text,
   line_userid     text,                    -- << main_5_lead_database ดึงไปใช้
   payslip_drive   text,
+  -- ลิงก์ชีทรายคน (HR Sheet คอลัมน์ U) — บางคนมีหลายลิงก์คั่น comma
+  -- ใช้ตอน backfill ว่า listing ไหนเป็นของเซลคนไหน (created_by ในชีททรัพย์เป็น Stone ทั้งหมด)
+  sales_sheet_url text,
   -- สะพาน Auth <-> พนักงาน: ทุก RLS policy วิ่งผ่านตรงนี้ (auth.uid() -> employee_code)
   -- null = ยังไม่มีบัญชี login (เช่น พนักงานที่ลาออกแล้ว)
   auth_user_id    uuid unique references auth.users (id) on delete set null,
