@@ -8,6 +8,39 @@
 ฝั่ง DB เป็น **ไฟล์ SQL + CSV** เอาไปรัน/import ใน Supabase เอง
 เว็บแอปอยู่ใน `haus-crm/` — **เป็น git repo แยกต่างหาก + ถูก gitignore ใน repo แม่** (ดูหัวข้อ "เว็บแอป CRM" ท้ายไฟล์)
 
+---
+
+## 📌 สถานะปัจจุบัน — อ่านตรงนี้ก่อน (อัปเดต 2026-08-03)
+
+**ระบบขึ้นของจริงแล้ว** ไม่ใช่เดโมอีกต่อไป — ข้อมูลจริงเข้าครบ + ต้อง login ถึงใช้ได้
+
+| ด้าน | สถานะ |
+|---|---|
+| ข้อมูล | ✅ import จากชีทครบ — ทรัพย์ **511** · ลีด **953** · โครงการ **308** · เจ้าของ **452** · กิจกรรม **2,334** · Last Match **56** · พนักงาน **10** · โซน **30** |
+| Login | ✅ ใช้งานจริง — **9 บัญชี** (พนักงาน 8 + Admin) · บังคับ login แล้ว · มีหน้าเปลี่ยนรหัส `/account` |
+| สิทธิ์ | ✅ RBAC อยู่ใน DB — 35 สิทธิ์ · 8 บทบาท · ผูกกับพนักงานจริงแล้ว |
+| DB | ✅ 54 ตาราง · เงินเดือน/PII ล็อกแล้ว |
+| ⚠️ ความปลอดภัย | 🔴 **ตารางอื่นยังอ่านได้โดยไม่ต้อง login** (`demo_read_all`) — ข้อมูลลูกค้า 953 ราย + เจ้าของ 452 ราย ยังเปิดอยู่ |
+| ⚠️ การบันทึก | 🔴 **ปุ่ม save ทุกปุ่มยังเป็น stub** — แก้อะไรในเว็บยังไม่ลง DB (ยกเว้นเปลี่ยนรหัสผ่าน) |
+
+### งานถัดไปตามลำดับ
+1. **Phase 4 (RLS)** — ปิด `demo_read_all` ที่เหลือ · **ติดที่ `lib/queries.ts` ยังใช้ anon client ต้องย้ายไป `lib/supabase/server.ts` ก่อน** ไม่งั้นหน้าเว็บว่างหมด
+2. **Phase 3 (ต่อปุ่ม save)** — เริ่มจากหน้าแก้ไขทรัพย์ (ฟอร์มทำไว้แล้ว) → รับลีด → activities/tasks
+3. หน้าตั้งค่าโซนในเว็บยังเป็น 1 โซน 1 เซล ต้องแก้ให้รองรับหลายคน (DB รองรับแล้ว)
+4. หน้าจัดการบัญชีสำหรับ Admin (ตั้ง/รีเซ็ตรหัสให้คนอื่น)
+
+### 3 เรื่องที่ต้องรู้ก่อนแตะอะไร
+1. **อย่าเชื่อตัวเลขใน `haus-crm/DATA_MODEL.md`** — ประเมินขนาดข้อมูลต่ำไป 3–8 เท่า และบอกว่า `Created By` เป็น Stone ทั้งหมด (ผิด กระจายครบ 6 คน)
+2. **ชีทต้นทางกรอกผิดช่องหลายจุด** — ถ้าต้อง import อะไรเพิ่ม ให้โปรไฟล์ข้อมูลก่อนเสมอ อย่าเชื่อหัวคอลัมน์ (ดูรายละเอียดใต้หัวข้อ Import)
+3. **การมอบหมายงานยึดที่ "ทรัพย์" ไม่ใช่ "โซน"** — `main_4.sale_id` คือตัวจริง โซนเป็นแค่ตัวสำรอง
+
+### รอจากคน
+- **HR**: `date_started` ของพนักงานทุกคน (ชีทไม่มี → ladder เซลใหม่ + โควตาลาปีแรกใช้ไม่ได้) · โควตาวันลาจริง (ที่ใส่ไว้เป็นขั้นต่ำตามกฎหมาย ซึ่งผิดแน่ เพราะ 5/8 คนใช้เกินแล้ว)
+- **CEO**: ใครเป็นหัวหน้าทีม (ยังไม่มีใครถือ role `sales_leader`, ตาราง `teams` ว่าง) · แท็ก Lead จริง (ตอนนี้ seed ไว้ 4 อัน)
+- **Ben**: ปิด **Vercel Deployment Protection** ถึงจะเปิดเว็บจาก URL สาธารณะได้ (ตอนนี้ Vercel ตีกลับก่อนถึงแอป)
+
+---
+
 ## โครงสร้างโฟลเดอร์ (จัดใหม่ 2026-08-03)
 ```
 Haus-Web-Wp.Ben/
@@ -178,23 +211,36 @@ price_remark, unit_condition, close_type
 แอปเวอร์ชันเก่า (5 หน้า) **ถูกทับด้วยเวอร์ชัน design-first เต็ม (23 routes) แล้ว** — ของเก่ายังกู้ได้จาก git tag **`v1-legacy`**
 
 - **เอกสารส่งมอบอยู่ในโฟลเดอร์แอป** อ่านตามลำดับนี้: [DATA_MODEL.md](haus-crm/DATA_MODEL.md) (บล็อก HANDOVER บนสุด) → [HANDOVER_CHECKLIST.md](haus-crm/HANDOVER_CHECKLIST.md) → [CEO_FEEDBACK_R1.md](haus-crm/CEO_FEEDBACK_R1.md)
-- **UI เสร็จหมด แต่ยังไม่ต่อของจริง**: ไม่มี auth (หน้า `/login` เป็นดีไซน์), ทุก state เก็บใน React Provider (refresh แล้วหาย), ทุกปุ่ม save เป็น stub, อ่านจริงจาก Supabase แค่ `v_main_listing` / `main_6_buyer_crm` / `v_sale_status`
-- **RBAC ใน `lib/rbac.ts` = สเปกที่ RLS ต้องทำตาม** แต่ตอนนี้แค่ซ่อนเมนูฝั่ง browser ยังไม่ป้องกันอะไรจริง
-- **ลำดับงาน**: identity bridge (`auth.uid()` ↔ `main_1_hr.employee_code`) → auth → import จาก Google Sheets (ครั้งเดียว ไม่มี two-way sync) → write path ทีละหน้า → RLS
-- **การตัดสินใจเรื่อง auth (Ben, 2026-08-03)**: login ด้วย **อีเมลส่วนตัว** (`main_1_hr.email` ไม่ใช่ `work_email`) และ **Admin ตั้งรหัสผ่านให้ user ได้** → ต้องมี server route ที่เรียก Supabase Admin API ด้วย `service_role` key (เก็บฝั่ง server เท่านั้น ห้าม `NEXT_PUBLIC_`) แล้ว gate ด้วย `people.manage`
+- ⚠️ **เอกสาร 3 ไฟล์นั้นเขียนไว้ตอนเฟสออกแบบ — หลายอย่างล้าสมัยแล้ว** (ขนาดข้อมูล · "ไม่มี auth" · "ทุก state อยู่ใน memory") ให้เชื่อ CLAUDE.md ไฟล์นี้ก่อน แล้วใช้ 3 ไฟล์นั้นดู**เหตุผลเบื้องหลังการออกแบบ** ซึ่งยังใช้ได้อยู่
+- **สิ่งที่ต่อของจริงแล้ว**: auth + session + สิทธิ์จาก DB · `/account` เปลี่ยนรหัส · อ่านข้อมูลจริงจาก `v_main_listing` / `main_6_buyer_crm` / `v_sale_status`
+- **สิ่งที่ยังเป็นของปลอม**: ทุกปุ่ม save (นอกจากเปลี่ยนรหัสผ่าน) · store ในหน้า ตั้งค่า/กิจกรรม/วันลา ยังเก็บใน React Provider (refresh แล้วหาย)
+- **RBAC ใน `lib/rbac.ts` = สเปก** ตอนนี้ย้ายเข้า DB แล้ว (ตาราง `roles`/`permissions`/`user_roles`) แต่ **ฝั่งแอปยังกรองแค่เมนู** — การป้องกันจริงต้องรอ RLS
+- **การตัดสินใจเรื่อง auth (Ben, 2026-08-03)**: login ด้วย **อีเมลส่วนตัว** (`main_1_hr.email` ไม่ใช่ `work_email`) และ **Admin ตั้งรหัสผ่านให้ user ได้** → ต้องมี server route ที่เรียก Supabase Admin API ด้วย `service_role` key (เก็บฝั่ง server เท่านั้น ห้าม `NEXT_PUBLIC_`) แล้ว gate ด้วย `people.manage` (ยังไม่ได้ทำ)
 - **เป็น git repo แยก** (remote: `github.com/hauslivingestate-hash/haus-crm`) — repo แม่ gitignore โฟลเดอร์นี้ไว้ ต้อง `cd haus-crm` ก่อนทำ git ของแอป
 - **Deploy = import repo เข้า Vercel** (Hobby plan) → auto-deploy ทุกครั้งที่ push `main`. env var ตั้งใน Vercel ได้แต่ **ไม่จำเป็น** เพราะ...
 - **Supabase config ใส่เป็น fallback ในโค้ดแล้ว** ([lib/supabase.ts](haus-crm/lib/supabase.ts)) — url + publishable(anon) key ฝังไว้ (ปลอดภัย เพราะเป็น public key + RLS ป้องกัน) แอปเลยรันได้เองไม่ต้องตั้ง env. ถ้าตั้ง `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` ใน Vercel จะ override ค่า fallback
 
 ### ข้อควรระวังตอน deploy (เจอมาแล้ว)
+- ⚠️ **Vercel Deployment Protection เปิดอยู่** (2026-08-03) → เปิด URL แล้วเด้งไป `vercel.com/sso-api` **ตั้งแต่ก่อนถึงแอป** แม้แต่หน้า `/login` — ไม่ใช่บั๊กของเรา. ปิดที่ Settings → Deployment Protection → Vercel Authentication = Disabled (ปิดได้แล้วเพราะแอปมี login ของตัวเอง). URL ที่มี `-git-main-` เป็น deployment ของ branch ไม่ใช่ production
 - ⚠️ **Vercel Hobby + private repo บล็อก deploy ถ้า commit author ไม่ใช่เจ้าของบัญชี** → ต้อง commit ด้วยอีเมล `hauslivingestate@gmail.com` (ตั้ง git identity ของ repo haus-crm ไว้แล้ว: `git config user.email hauslivingestate@gmail.com`)
 - ⚠️ **ห้ามรัน `npm audit fix --force`** ในแอปนี้ → มันจะ downgrade Next.js กลับ 9.x พังทั้งแอป
 - `npm audit` เตือน 3 high (next / postcss / sharp) — เป็นของที่ **ฝังมากับ Next.js เอง** (build-time) แก้เองไม่ได้ รอ Next.js อัป
 
 ### ประวัติงาน (2026-08-03) — รับช่วงต่อ
-- ทับ `haus-crm/` ด้วยแอปเวอร์ชัน design-first เต็ม (23 routes) — ของเก่าอยู่ที่ git tag `v1-legacy`
-- จัดโฟลเดอร์แม่ใหม่: `db/`, `db/samples/`, `docs/`, `import/`
-- เช็คสคีมาจริงบน Supabase → บันทึกไว้ในหัวข้อ TODO 🔴 ด้านบน
+ทำในเซสชันเดียว เรียงตามลำดับ:
+
+1. **จัดบ้าน** — ทับ `haus-crm/` ด้วยแอป design-first เต็ม 23 routes (ของเก่าอยู่ที่ git tag `v1-legacy`) · จัดโฟลเดอร์แม่เป็น `db/` `docs/` `import/` · push ขึ้น GitHub ทั้ง 2 repo
+2. **เช็คของจริง** — เช็คสคีมา Supabase แล้วพบว่าเอกสารส่งมอบคลาดเคลื่อนหลายจุด (15 คอลัมน์ที่ "แค่แก้ view" จริง ๆ ไม่มีใน base table เลย)
+3. **เติมสคีมา** — 17 คอลัมน์ทรัพย์ + 11 คอลัมน์ CRM + `lead_tags_ref` + 12 ตารางที่แอปต้องใช้ (activities/tasks/targets/contacts/leave/notifications/audit) + RBAC 5 ตาราง
+4. **เปลี่ยนหลักคิดการมอบหมาย** — จาก "โซนตัดสิน" เป็น **"ทรัพย์ตัดสิน"** (`main_4.sale_id`) → โซนมีหลายเซลได้ (`zone_sales`) ลบ `zone.sale_id_assigned` ทิ้ง
+5. **Auth** — `@supabase/ssr` + middleware + LoginForm จริง + `/account` เปลี่ยนรหัส + สิทธิ์มาจาก DB
+6. **Import ชีท HR** — พนักงาน 9 · โซน 29 · ใบลา 20 · บทบาท
+7. **สร้างบัญชี 9 บัญชี** + เปิดบังคับ login + ทดสอบด้วยเบราว์เซอร์จริง
+8. **ปิดรูรั่วเงินเดือน/PII** ด้วย GRANT ระดับคอลัมน์ + view `v_employee_private`
+9. **Import ชีทหลัก** — 511 ทรัพย์ · 953 ลีด · 308 โครงการ · 2,334 กิจกรรม (เจอชีทกรอกผิดช่อง 2 จุด แก้ระหว่าง import)
+10. **เปลี่ยนวันที่ทั้งแอปเป็น DD/MM/YYYY** (ค.ศ.) · เพิ่ม Vercel MCP ใน `.mcp.json`
+
+**บทเรียนที่ควรจำ:** เอกสารส่งมอบเขียนไว้ดีแต่ข้อมูลเก่า — ทุกครั้งที่จะเชื่ออะไรจากเอกสาร **ให้ยิงเช็คของจริงก่อน** (เช็คสคีมา / โปรไฟล์ CSV) เพราะรอบนี้ผิดทั้งขนาดข้อมูล ชนิดคอลัมน์ และเจ้าของทรัพย์
 
 ### ประวัติงาน (2026-07-07)
 - อัป **Next.js 15.1.6 → 15.5.20** ปิดช่องโหว่ CVE-2025-66478
