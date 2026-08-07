@@ -10,24 +10,24 @@
 
 ---
 
-## 📌 สถานะปัจจุบัน — อ่านตรงนี้ก่อน (อัปเดต 2026-08-03)
+## 📌 สถานะปัจจุบัน — อ่านตรงนี้ก่อน (อัปเดต 2026-08-07)
 
-**ระบบขึ้นของจริงแล้ว** ไม่ใช่เดโมอีกต่อไป — ข้อมูลจริงเข้าครบ + ต้อง login ถึงใช้ได้
+**ระบบขึ้นของจริงแล้ว** ไม่ใช่เดโมอีกต่อไป — ข้อมูลจริงเข้าครบ + ต้อง login ถึงใช้ได้ + RLS ปิดครบแล้ว + **มี write path จุดแรกแล้ว**
 
 | ด้าน | สถานะ |
 |---|---|
 | ข้อมูล | ✅ import จากชีทครบ — ทรัพย์ **511** · ลีด **953** · โครงการ **308** · เจ้าของ **452** · กิจกรรม **2,334** · Last Match **56** · พนักงาน **10** · โซน **30** |
 | Login | ✅ ใช้งานจริง — **9 บัญชี** (พนักงาน 8 + Admin) · บังคับ login แล้ว · มีหน้าเปลี่ยนรหัส `/account` |
 | สิทธิ์ | ✅ RBAC อยู่ใน DB — 35 สิทธิ์ · 8 บทบาท · ผูกกับพนักงานจริงแล้ว |
-| DB | ✅ 54 ตาราง · เงินเดือน/PII ล็อกแล้ว |
-| ⚠️ ความปลอดภัย | 🔴 **ตารางอื่นยังอ่านได้โดยไม่ต้อง login** (`demo_read_all`) — ข้อมูลลูกค้า 953 ราย + เจ้าของ 452 ราย ยังเปิดอยู่ |
-| ⚠️ การบันทึก | 🔴 **ปุ่ม save ทุกปุ่มยังเป็น stub** — แก้อะไรในเว็บยังไม่ลง DB (ยกเว้นเปลี่ยนรหัสผ่าน) |
+| DB | ✅ 54 ตาราง · เงินเดือน/PII ล็อกแล้ว · +1 function (`create_owner`, ดู Phase 5 ข้อ 1) |
+| ความปลอดภัย | ✅ **RLS Phase 4 ปิดครบแล้ว** — `demo_read_all` + anon ถูกถอนหมด (ดูรายละเอียดใต้ Phase 4) |
+| ⚠️ การบันทึก | 🟡 **เริ่มแล้ว 1/6 — แก้ทรัพย์เขียนจริงแล้ว** ที่เหลือ (แก้ลีด/เพิ่มลีด/มอบหมาย/เพิ่มทรัพย์/ติ๊กงาน) ยัง stub (ดู Phase 5) |
 
-### งานถัดไปตามลำดับ
-1. **Phase 4 (RLS)** — ปิด `demo_read_all` ที่เหลือ · **ติดที่ `lib/queries.ts` ยังใช้ anon client ต้องย้ายไป `lib/supabase/server.ts` ก่อน** ไม่งั้นหน้าเว็บว่างหมด
-2. **Phase 3 (ต่อปุ่ม save)** — เริ่มจากหน้าแก้ไขทรัพย์ (ฟอร์มทำไว้แล้ว) → รับลีด → activities/tasks
-3. หน้าตั้งค่าโซนในเว็บยังเป็น 1 โซน 1 เซล ต้องแก้ให้รองรับหลายคน (DB รองรับแล้ว)
-4. หน้าจัดการบัญชีสำหรับ Admin (ตั้ง/รีเซ็ตรหัสให้คนอื่น)
+### งานถัดไปตามลำดับ (ดูรายละเอียดเต็มที่ 🗺️ แผนเฟส ด้านล่าง)
+1. **Phase 5 (Write path)** — ต่อปุ่ม save ทุกหน้า: ~~แก้ทรัพย์~~ ✅ → **แก้ลีด/เปลี่ยนสเตจ (ถัดไป)** → เพิ่มลีด → มอบหมายลีด → เพิ่มทรัพย์ → ติ๊กงาน `/today`
+2. **Phase 6** — เชื่อมหน้าที่ยังอ่านจาก seed ในโค้ด (~9 หน้า: `/` `/today` `/contacts` `/projects` `/last-match` `/team` `/leave` `/new-sales` `/website`) ให้ query DB จริง
+3. หน้าตั้งค่าโซนในเว็บยังเป็น 1 โซน 1 เซล ต้องแก้ให้รองรับหลายคน (DB รองรับแล้วผ่าน `zone_sales`)
+4. หน้าจัดการบัญชีสำหรับ Admin (ตั้ง/รีเซ็ตรหัสให้คนอื่น) — ต้องมี server route ถือ `service_role`
 
 ### 3 เรื่องที่ต้องรู้ก่อนแตะอะไร
 1. **อย่าเชื่อตัวเลขใน `haus-crm/DATA_MODEL.md`** — ประเมินขนาดข้อมูลต่ำไป 3–8 เท่า และบอกว่า `Created By` เป็น Stone ทั้งหมด (ผิด กระจายครบ 6 คน)
@@ -125,16 +125,16 @@ price_remark, unit_condition, close_type
 | 2 | Auth จริง (login/session/บังคับ + หน้าเปลี่ยนรหัส) | ✅ เสร็จ 2026-08-03 |
 | 3 | Import จากชีท (ครั้งเดียว ไม่มี two-way sync) | ✅ เสร็จ 2026-08-03 |
 | 4 | **RLS ทั้งระบบ + ถอน anon** | ✅ เสร็จ 2026-08-03 |
-| **5** | **Write path — ต่อปุ่ม save ทุกหน้า** | 🔴 **ยังไม่เริ่ม — เฟสใหญ่สุดที่เหลือ** |
+| **5** | **Write path — ต่อปุ่ม save ทุกหน้า** | 🟡 **เริ่มแล้ว 1/6 — แก้ทรัพย์เขียนจริงแล้ว 2026-08-07** |
 | **6** | **เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง (~17 routes)** | 🔴 ยังไม่เริ่ม |
 | **7** | **งานแอดมิน/ops ที่ยังไม่มีที่ทำ** | 🟡 บางส่วน |
 | **8** | **ฟีเจอร์แยก (มีเอกสารของตัวเอง)** | ⬜ ยังไม่เริ่ม |
 
-### เฟส 5 — Write path (ต่อปุ่ม save) 🔴
-**ตอนนี้ทั้งแอปเป็น read-only** — อ่านจริงแค่ 7 หน้า (`/listings` `/listings/[id]` `/leads` `/leads/[id]` `/assign` `/company-listings` `/settings`) และ **ทุกปุ่มบันทึกเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย
-- ✅ **ข่าวดี: policy ฝั่ง DB พร้อมแล้ว** — เฟส 4 เขียน insert/update/delete ครบทุกตาราง ต่อ write ได้เลยไม่โดน 403
-- เรียงตามความคุ้ม: แก้ทรัพย์ (`ListingEditSheet`) → แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet`) → เพิ่มลีด (`LeadIntakeFab`) → มอบหมายลีด (`/assign`) → เพิ่มทรัพย์ (`ListingIntakeButton`) → ติ๊กงาน `/today` (เขียน `tasks` + `activities`)
-- ทุกจุดต้องเขียน `audit_log` ด้วย (`changed_by` = ตัวเอง ไม่งั้น policy ปฏิเสธ)
+### เฟส 5 — Write path (ต่อปุ่ม save) 🟡 เริ่มแล้ว 1/6
+**ทุกปุ่มบันทึกเคยเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย — **ข้อ 1 เขียนจริงแล้ว 2026-08-07** (ดูรายละเอียดที่ 🔖 ค้างอยู่ตรงนี้ ด้านบน)
+- ✅ **ข่าวดี: policy ฝั่ง DB พร้อมแล้ว** — เฟส 4 เขียน insert/update/delete ครบทุกตาราง ต่อ write ได้เลยไม่โดน 403 (ยกเว้น edge case `main_2_owner` insert ใหม่ที่ต้องผ่าน RPC `create_owner` — ดูด้านบน)
+- เรียงตามความคุ้ม: ~~แก้ทรัพย์ (`ListingEditSheet`)~~ ✅ → **แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet`) — ถัดไป** → เพิ่มลีด (`LeadIntakeFab`) → มอบหมายลีด (`/assign`) → เพิ่มทรัพย์ (`ListingIntakeButton`) → ติ๊กงาน `/today` (เขียน `tasks` + `activities`)
+- ทุกจุดต้องเขียน `audit_log` ด้วย (`changed_by` = ตัวเอง ไม่งั้น policy ปฏิเสธ) — pattern อยู่ใน [lib/mutations/listings.ts](haus-crm/lib/mutations/listings.ts) แล้ว ก็อบโครงได้เลย
 - `main_6_buyer_crm.tag_id` มีคอลัมน์แล้วแต่แอปยังเก็บแท็กใน `NewLeadsProvider` — ย้ายมาเขียนจริงตอนนี้
 
 ### เฟส 6 — เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง 🔴
@@ -155,35 +155,48 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 
 ---
 
-## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-03 ปลายวัน)
+## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-07)
 
-### 🔴 บั๊กเปิดค้าง: หน้า `/leads` ขึ้น "Application error: a client-side exception has occurred"
-Ben เจอตอนกดเมนู **Lead** บน production (`haus-crm-iota.vercel.app/leads`) — จอขาว ไม่มี sidebar
-**ยังไม่ได้แก้ ยังไม่รู้สาเหตุ** ผมจำลองไม่สำเร็จเลยสักครั้ง
+### ✅ เสร็จ 2026-08-07: Phase 5 ข้อ 1 — เขียนจริงหน้าแก้ไขทรัพย์ (`ListingEditSheet`)
+**นี่คือ write ตัวแรกของทั้งแอป** — ตอนก่อนหน้านี้ทั้งโค้ดเบสไม่มี `.insert()/.update()/.delete()` หรือ `"use server"` เลยสักที่ ยังไม่ push ไปยัง git
 
-**ตัดออกไปแล้ว (อย่าเสียเวลาลองซ้ำ):**
-- ไม่ใช่ข้อมูลว่าง — 0 แถวก็เรนเดอร์ปกติ (server 200, console error 0)
-- ไม่ใช่ข้อมูล null — ยัด row ที่ `lead_name`/`phone`/`pipeline_stage`/`lead_status`/`lead_type`/`sale_id` เป็น null ครบก็ไม่พัง
-- ไม่ใช่ dev-only — build production แล้ว `next start` ก็ไม่พัง
-- ไม่ใช่เรื่องสิทธิ์/ตัวตน — จำลอง session ระดับ agent (ชื่อที่ไม่มีใน `SEED_USERS`) แล้ว sidebar ขึ้น "Q · Agent (Sales)" ถูกต้อง ไม่พัง
-- ไม่ใช่ provider หาย — provider ทุกตัวใน `app/(app)/layout.tsx` mount แบบไม่มีเงื่อนไข
-- โค้ดที่รับข้อมูลใน `LeadsBrowser` null-safe หมด (`Avatar` `GradeChip` `stageMeta` `leadStatusDot` `findTag`)
-- เช็ค null ใน `main_6_buyer_crm` จริงทั้ง 953 แถว — ไม่มีอะไรผิดรูปพอจะทำให้พัง
+**ไฟล์ที่แก้ (ใน `haus-crm/`, ยังไม่ commit):**
+- **[lib/mutations/listings.ts](haus-crm/lib/mutations/listings.ts) (ใหม่)** — `"use server"` export `updateListing(listingId, patch)`. แก้ `main_4_listing_database` โดยตรง (ไม่ใช่ view) — ดึงแถวปัจจุบันสดจาก DB ก่อนเทียบ diff (ไม่เชื่อ client) แบ่งฟิลด์เป็น `core`/`marketing` ตาม `LISTING_FIELDS` map (คุมทั้ง type-coerce และสิทธิ์แก้) เขียน `audit_log` ทุกครั้งที่มีการเปลี่ยนจริง แล้ว `revalidatePath` 3 หน้า (`/listings` `/listings/[id]` `/company-listings`)
+- **[components/ListingEditSheet.tsx](haus-crm/components/ListingEditSheet.tsx)** — `submit()` เรียก `updateListing` จริงแล้ว (ไม่ใช่ `console.log` stub) มี busy/error state แบบเดียวกับ `AccountSettings.tsx` · ฟิลด์ "โครงการ" (`project_name_eng`) ล็อกแก้ไม่ได้ตามที่ Ben ตัดสินใจ (กระทบทุก listing ในโครงการเดียวกัน) · เจ้าของไม่ต้อง disable อะไร — กรอกตอนไม่มี `owner_id` แล้วบันทึกจะสร้างเจ้าของใหม่ให้เอง
 
-**สมมติฐานที่เหลือ (เรียงตามน่าจะเป็น):**
-1. **chunk ค้างจาก deploy เก่า** — แท็บ Ben เปิดค้างระหว่างที่ deploy ไป 3 รอบ พอกด client-side nav ไป `/leads` เบราว์เซอร์ขอไฟล์ JS ของ build ที่ถูกลบแล้ว → 404 → error ตัวนี้เป๊ะ **วิธีพิสูจน์: Ctrl+Shift+R ถ้าหาย = ไม่ใช่บั๊ก**
-2. ถ้ายังพัง → ต้องได้ **console error จริง** (F12 → Console) หรืออ่าน Vercel runtime error
+**ปิดช่องโหว่ไปด้วยระหว่างทาง**: `main_4` UPDATE policy ไม่กรองคอลัมน์ (role `marketing` เดิมมีทางแก้ราคาได้ถ้ามีจุดเข้าฟอร์มนี้) — `updateListing` กรองเองที่ชั้นแอปผ่าน `LISTING_FIELDS[key].group` (core ต้อง `listings.edit`, marketing ต้อง `listings.marketing`) ทดสอบแล้วว่า field ที่ไม่มีสิทธิ์ถูกกรองทิ้งเงียบๆ ไม่ถึง DB
 
-**⚠️ Vercel MCP token หมดอายุ** ระหว่างเซสชัน → อ่าน `get_runtime_errors` / `get_runtime_logs` ไม่ได้ ต้องต่อใหม่ใน `/mcp` ก่อน
+**🐛 บั๊กที่เจอระหว่างทดสอบจริง (ทั้งคู่แก้แล้ว):**
+1. **RLS ของ `main_2_owner` บล็อกการสร้างเจ้าของใหม่** — `INSERT ... RETURNING owner_id` (ที่ supabase-js ทำเวลาใช้ `.insert().select()`) โดน SELECT policy เช็คด้วย และ SELECT policy ให้เห็นเฉพาะเจ้าของที่ **มี listing ผูกอยู่แล้ว** — เจ้าของที่เพิ่งสร้างยังไม่ผูกกับใคร เลยมองไม่เห็นตัวเอง ชน 42501 ทุกครั้ง (ทดสอบเจอจริงกับ Mhow/S-004 ผ่าน browser-automation ก่อนจะแก้)
+   **แก้**: เพิ่ม SQL function `create_owner(name,phone,line) returns bigint` (`security definer`, เช็คสิทธิ์เองเหมือน INSERT policy เดิมทุกประการ) — apply เป็น migration `add_create_owner_rpc` แล้วบน production. `updateListing` เรียกผ่าน `.rpc('create_owner', ...)` แทน `.insert().select()`
+2. **`router.refresh()` ทำให้ข้อความ "บันทึกแล้ว" หายเกือบทันที** — `useEffect` ที่ reset draft ตอนเปิดชีท (`if (open) { setF/setDone/setError }`) มี `listing` เป็น dependency ด้วย พอ `router.refresh()` ทำให้ parent ส่ง `listing` prop ใหม่มา (ข้อมูลสดจาก DB) effect รันซ้ำและล้าง `done` ทิ้งทันที
+   **แก้**: เปลี่ยน dependency เหลือแค่ `[open]` — reset เฉพาะตอนชีท**เปิด** ไม่ใช่ทุกครั้งที่ `listing` prop เปลี่ยนระหว่างเปิดอยู่
 
-**วิธีจำลอง production ในเครื่อง (ใช้ซ้ำได้ เร็วดี):** patch ชั่วคราว 2 จุด แล้วรันด้วย env
-- `app/(app)/layout.tsx` → ให้ `auth` มาจาก `process.env.FAKE_SESSION` (คอมมาคั่น permission)
-- `lib/queries.ts` → `getCrm()` คืน array ปลอมเมื่อ `FAKE_CRM=1`
-- `NEXT_PUBLIC_AUTH_ENFORCED=0` (ปิด middleware) แล้วยิงด้วย skill `browser-automation` เพื่อดู console error
-- ⚠️ **patch พวกนี้ revert แล้ว** อย่าเผลอ commit ถ้าทำใหม่
+**วิธีทดสอบที่ใช้** (ยืนยันว่าเขียนจริง ไม่ใช่แค่ UI ขึ้นข้อความ): login จริงเป็น Mhow (S-004, role agent) ผ่าน `browser-automation` skill (สคริปต์ custom ผ่าน `--script`, ต้องใช้ path แบบ `/C:/Users/...` ถึงจะไม่ชน bug ของ `browser.mjs` เอง — `scriptPath.startsWith('/')` เท่านั้นที่ import ตรงๆ ไม่พังบน Windows) → แก้ทรัพย์ `HPHU106` จริง → เช็คด้วย Supabase MCP ว่า `main_4_listing_database` + `main_2_owner` + `audit_log` เปลี่ยนตรงตามที่กด รวมถึงเช็คว่า trigger เดิม (`trg_set_livinginsider_date` ตั้ง `updated_at` ให้เอง, `trg_log_listing_status_change` เขียน `main_9_support_log`) ยังทำงานอยู่ใต้ RLS ปกติ — **ทดสอบเสร็จแล้วลบ/คืนค่าข้อมูลทดสอบทั้งหมด** (remark/listing_status คืนค่าเดิมผ่าน UI, เจ้าของทดสอบลบด้วย SQL ตรงเพราะ UI ยังไม่มีปุ่มลบเจ้าของ)
+
+**ยังไม่ทำ (บันทึกไว้กันลืม)**:
+- ยังไม่ backfill `main_9_support_log.support_id` (เป็น null เหมือนเดิม — ต้อง query แบบ heuristic ถ้าจะทำ แยกเป็นงานเดี่ยว)
+- **ยังไม่ commit/push** ทั้ง `haus-crm` (โค้ด) และ repo แม่ (CLAUDE.md นี้) — ของยังอยู่ในเครื่องเท่านั้น
+- Phase 5 ข้อ 2-6 (แก้ลีด/เพิ่มลีด/มอบหมาย/เพิ่มทรัพย์/ติ๊กงาน) ยังไม่เริ่ม — ใช้ pattern เดียวกับข้อ 1 ได้เลย (server action ใน `lib/mutations/*.ts` + re-fetch แถวจริงก่อน diff + audit_log + revalidatePath)
+
+**ขั้นต่อไปตอนกลับมาทำ**: ถาม Ben ว่าจะ commit/push `haus-crm` เลยไหม → เริ่ม Phase 5 ข้อ 2 (แก้ลีด/เปลี่ยนสเตจ ใน `LeadEditSheet` หรือชื่อ component ที่ใกล้เคียง — ยังไม่ได้เปิดดูไฟล์จริง)
+
+---
+
+### ✅ แก้แล้ว 2026-08-05: บั๊กหน้า `/leads` — "Application error: a client-side exception has occurred"
+สาเหตุจริง**ไม่ใช่**เรื่อง chunk ค้าง/deploy เก่าอย่างที่เดาไว้รอบก่อน (ลอง Ctrl+Shift+R แล้วยังพัง) — เป็นบั๊กจริงในโค้ด:
+
+**สาเหตุ**: [lib/tags.ts](haus-crm/lib/tags.ts) ฟังก์ชัน `seedTagForLead()` (ตัวสุ่มแท็กแบบ deterministic ที่ยังไม่ได้ต่อ `tag_id` จริงจาก DB) ใช้ `h >> 3` (signed right shift) กับ hash ที่เป็น unsigned 32-bit — พอ hash ≥ 2^31 จะได้ index ติดลบ ทำให้ `tags[index]` เป็น `undefined` แล้วพังตอนอ่าน `.id` ต่อ → "Cannot read properties of undefined (reading 'id')"
+ดึงข้อมูลลีดจริงทั้ง 953 แถวจาก Supabase มารันฟังก์ชันนี้ตรงๆ พบว่า **294/953 lead_id ชนบั๊กนี้พอดี** — แก้เป็น `h >>> 3` (unsigned shift) แล้วรันซ้ำ 0 error
+
+**แก้ไปด้วย 2 commit** ใน `haus-crm` (push แล้ว, deploy ขึ้น production เรียบร้อย):
+1. `lib/tags.ts:69` — `>>` → `>>>` (ตัวจริง)
+2. `components/Sidebar.tsx:127` — `roles.find(r => r.id === id)` → `r?.id === id` (กันไว้เพิ่ม จุดเดียวในแอปที่อ่าน `.id` แบบไม่กัน แม้พิสูจน์ไม่ได้ว่าเป็นสาเหตุจริง)
+
+**บทเรียน**: เดา root cause จากอ่านโค้ดอย่างเดียวไม่พอ — ตัวที่ยืนยันได้จริงคือดึง **real data จาก Supabase มารันฟังก์ชัน logic ตรงๆ นอกเว็บ** (ไม่ต้องพึ่ง login/browser) เจอ error ตรงเป๊ะทันที ควรทำเป็นขั้นแรกๆ เวลาเจอบั๊กที่เกี่ยวกับข้อมูลจริง แทนที่จะไล่อ่านโค้ดหรือจำลอง session
 
 ### 🟡 ค้างจากรอบนี้ (ไม่เร่ง)
-- **role `marketing` ยังแก้ราคาทรัพย์ได้** — RLS กรองแถวไม่ได้กรองคอลัมน์ ต้องทำ RPC เฉพาะคอลัมน์การตลาด
+- **role `marketing` ยังแก้ราคาทรัพย์ได้ผ่าน DB โดยตรง (RLS)** — RLS กรองแถวไม่ได้กรองคอลัมน์ ยังจริงอยู่ในระดับ DB (ต้องทำ RPC เฉพาะคอลัมน์การตลาดถ้าจะปิดที่ต้นทาง) **แต่ผ่าน `updateListing` (Phase 5 ข้อ 1) ปิดแล้วที่ชั้นแอป** — เส้นทางเขียนอื่นในอนาคต (ถ้ามี) ต้องกรองเองซ้ำแบบเดียวกัน อย่าลืม
 - **`v_sale_status` เป็น security_invoker** → เซลเห็นเลขตัวเอง คนอื่นเป็น 0 ถ้า Ben อยากได้กระดานผลงานทั้งทีมต้องทำ view แยกแบบ security definer
 - **หน้า "ทรัพย์" จะว่างสำหรับ Marketing/Admin/HR** (ไม่ได้ดูแลทรัพย์เอง) — ตั้งใจตามดีไซน์ แต่ถ้า support อยากเห็นทั้งหมดในหน้าแรกด้วย แก้ที่ `getMyListings()` บรรทัดเดียว
 - ยังไม่มีหน้าจัดการบัญชีสำหรับ Admin (ต้องมี server route ถือ `service_role` + gate ด้วย `people.manage`)

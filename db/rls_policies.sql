@@ -455,3 +455,34 @@ create policy p_select on public.main_2_owner for select to authenticated
   );
 create index if not exists idx_main_4_owner_id on public.main_4_listing_database (owner_id);
 create index if not exists idx_main_4_sale_id  on public.main_4_listing_database (sale_id);
+
+-- ============================================================
+-- 12) เพิ่มเติม 2026-08-07 (Phase 5 ข้อ 1 — เขียนจริงหน้าแก้ไขทรัพย์) — สร้างเจ้าของใหม่ไม่ได้
+--     ผลข้างเคียงของแก้ #11 ข้างบน: p_select ของ main_2_owner ให้เห็นเฉพาะเจ้าของที่ "มี
+--     listing ผูกอยู่แล้ว" — เจ้าของที่เพิ่งสร้าง (ยังไม่ผูกกับใคร) เลยมองไม่เห็นตัวเอง
+--     `insert ... returning owner_id` (สิ่งที่ supabase-js ทำเวลาเรียก .insert().select())
+--     โดน p_select เช็คด้วย เลยชน 42501 ทุกครั้งที่จะสร้างเจ้าของใหม่ (เจอจริงตอนทดสอบ
+--     ListingEditSheet ผ่าน browser-automation กับบัญชี Mhow/S-004)
+--     ทางแก้: RPC security definer ที่เช็คสิทธิ์เอง (เหมือน p_insert เดิมทุกประการ) แล้ว
+--     insert ตรงๆ โดยไม่ใช้ returning ผ่าน RLS — ฟังก์ชันรันด้วยสิทธิ์เจ้าของ (ไม่ force
+--     row security) เลยไม่ชน p_select ระหว่างสร้าง
+-- ============================================================
+create or replace function public.create_owner(p_name text, p_phone text, p_line text)
+returns bigint
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_id bigint;
+begin
+  if not (has_perm('listings.create') or has_perm('listings.edit') or has_perm('roles.manage')) then
+    raise exception 'insufficient permission' using errcode = '42501';
+  end if;
+  insert into main_2_owner (owner_name, owner_phone, owner_line)
+    values (p_name, p_phone, p_line)
+    returning owner_id into v_id;
+  return v_id;
+end;
+$$;
+
+revoke execute on function public.create_owner(text, text, text) from anon;
