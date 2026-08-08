@@ -10,16 +10,16 @@
 
 ---
 
-## 📌 สถานะปัจจุบัน — อ่านตรงนี้ก่อน (อัปเดต 2026-08-07)
+## 📌 สถานะปัจจุบัน — อ่านตรงนี้ก่อน (อัปเดต 2026-08-08)
 
-**ระบบขึ้นของจริงแล้ว** ไม่ใช่เดโมอีกต่อไป — ข้อมูลจริงเข้าครบ + ต้อง login ถึงใช้ได้ + RLS ปิดครบแล้ว + **มี write path จุดแรกแล้ว**
+**ระบบขึ้นของจริงแล้ว** ไม่ใช่เดโมอีกต่อไป — ข้อมูลจริงเข้าครบ + ต้อง login ถึงใช้ได้ + RLS ปิดครบแล้ว + **มี write path จุดแรกแล้ว** + **มีหน้าจัดการบัญชีผู้ใช้แล้ว**
 
 | ด้าน | สถานะ |
 |---|---|
 | ข้อมูล | ✅ import จากชีทครบ — ทรัพย์ **511** · ลีด **953** · โครงการ **308** · เจ้าของ **452** · กิจกรรม **2,334** · Last Match **56** · พนักงาน **10** · โซน **30** |
-| Login | ✅ ใช้งานจริง — **9 บัญชี** (พนักงาน 8 + Admin) · บังคับ login แล้ว · มีหน้าเปลี่ยนรหัส `/account` |
-| สิทธิ์ | ✅ RBAC อยู่ใน DB — 35 สิทธิ์ · 8 บทบาท · ผูกกับพนักงานจริงแล้ว |
-| DB | ✅ 54 ตาราง · เงินเดือน/PII ล็อกแล้ว · +1 function (`create_owner`, ดู Phase 5 ข้อ 1) |
+| Login | ✅ ใช้งานจริง — **9 บัญชี** (พนักงาน 8 + Admin) · บังคับ login แล้ว · มีหน้าเปลี่ยนรหัส `/account` · **CEO/HR สร้าง/รีเซ็ตรหัสให้คนอื่นได้แล้วที่ ตั้งค่า → บัญชีผู้ใช้** |
+| สิทธิ์ | ✅ RBAC อยู่ใน DB — **36 สิทธิ์** · 8 บทบาท · ผูกกับพนักงานจริงแล้ว |
+| DB | ✅ 54 ตาราง · เงินเดือน/PII ล็อกแล้ว · +2 function (`create_owner` ดู Phase 5 ข้อ 1, `people.manage_accounts` เป็น permission ไม่ใช่ function — ดู Phase 7) |
 | ความปลอดภัย | ✅ **RLS Phase 4 ปิดครบแล้ว** — `demo_read_all` + anon ถูกถอนหมด (ดูรายละเอียดใต้ Phase 4) |
 | ⚠️ การบันทึก | 🟡 **เริ่มแล้ว 1/6 — แก้ทรัพย์เขียนจริงแล้ว** ที่เหลือ (แก้ลีด/เพิ่มลีด/มอบหมาย/เพิ่มทรัพย์/ติ๊กงาน) ยัง stub (ดู Phase 5) |
 
@@ -27,7 +27,7 @@
 1. **Phase 5 (Write path)** — ต่อปุ่ม save ทุกหน้า: ~~แก้ทรัพย์~~ ✅ → **แก้ลีด/เปลี่ยนสเตจ (ถัดไป)** → เพิ่มลีด → มอบหมายลีด → เพิ่มทรัพย์ → ติ๊กงาน `/today`
 2. **Phase 6** — เชื่อมหน้าที่ยังอ่านจาก seed ในโค้ด (~9 หน้า: `/` `/today` `/contacts` `/projects` `/last-match` `/team` `/leave` `/new-sales` `/website`) ให้ query DB จริง
 3. หน้าตั้งค่าโซนในเว็บยังเป็น 1 โซน 1 เซล ต้องแก้ให้รองรับหลายคน (DB รองรับแล้วผ่าน `zone_sales`)
-4. หน้าจัดการบัญชีสำหรับ Admin (ตั้ง/รีเซ็ตรหัสให้คนอื่น) — ต้องมี server route ถือ `service_role`
+4. ~~หน้าจัดการบัญชีสำหรับ Admin~~ ✅ เสร็จ 2026-08-08 — ดู Phase 7
 
 ### 3 เรื่องที่ต้องรู้ก่อนแตะอะไร
 1. **อย่าเชื่อตัวเลขใน `haus-crm/DATA_MODEL.md`** — ประเมินขนาดข้อมูลต่ำไป 3–8 เท่า และบอกว่า `Created By` เป็น Stone ทั้งหมด (ผิด กระจายครบ 6 คน)
@@ -145,7 +145,7 @@ price_remark, unit_condition, close_type
 - `lib/zones.ts` + `ZonesAdmin` ยังเป็น 1 โซน 1 เซล ต้องแก้ให้ตรง `zone_sales` (many-to-many + `is_primary`)
 
 ### เฟส 7 — แอดมิน/ops 🟡
-- **หน้าจัดการบัญชี** (ตั้ง/รีเซ็ตรหัสให้คนอื่น) — ต้องมี server route ถือ `service_role` key (ห้าม `NEXT_PUBLIC_`) + gate ด้วย `people.manage`
+- [x] **หน้าจัดการบัญชี** (สร้าง/รีเซ็ตรหัสให้คนอื่น) — เสร็จ 2026-08-08 ที่ `/settings` → "บัญชีผู้ใช้" ([AccountsManager](haus-crm/components/AccountsManager.tsx) + [lib/mutations/accounts.ts](haus-crm/lib/mutations/accounts.ts) + [lib/supabase/admin.ts](haus-crm/lib/supabase/admin.ts)) gate ด้วย permission ใหม่ `people.manage_accounts` (**CEO / HR / system_admin เท่านั้น** — Ben ตัดสินใจเจาะจงว่าไม่ใช่ `admin` business role และไม่ใช่ `people.manage` เดิมที่กว้างกว่า) — ทดสอบจริงผ่าน `browser-automation` แล้ว: สร้างบัญชีให้ Pai + รีเซ็ตรหัส Mhow ผ่านหน้านี้ ยืนยัน login ได้จริง แล้วลบ/คืนค่าทดสอบทั้งหมด (ลบ auth user ของ Pai ผ่าน Admin REST ตรง คืนอีเมลเดิมจากไฟล์ import, รีเซ็ตรหัส Mhow กลับเป็นของเดิม) — **ต้องตั้ง `SUPABASE_SERVICE_ROLE_KEY` ใน Vercel ด้วยก่อน production จะใช้ได้จริง** (ตอนนี้ตั้งไว้แค่ `.env.local` ในเครื่อง)
 - **`teams` ยังว่าง + ไม่มีใครเป็น `sales_leader`** — รอ CEO กำหนดหัวหน้าทีม (กระทบ `visible_employee_codes()` → ตอนนี้ "ทีม" = ตัวเองคนเดียว)
 - **`date_started` ว่างทุกคน** (ชีทไม่มี) — กระทบ ladder เซลใหม่ + โควตาลาปีแรก ต้องกรอกในเว็บ
 - ทิศ/ตำแหน่ง/อายุ/ส่วนกลาง ที่ import ปล่อยว่างไว้ (ชีทกรอกเลื่อนช่อง) รอกรอกใหม่ในเว็บ
@@ -155,7 +155,32 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 
 ---
 
-## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-07)
+## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-08)
+
+### ✅ เสร็จ 2026-08-08: หน้าจัดการบัญชีผู้ใช้ (สร้าง/รีเซ็ตรหัสผ่าน) — CEO/HR เท่านั้น
+Ben สั่งเพิ่มระหว่างคุยกันว่าเหลืออะไรบ้าง — ครั้งแรกบอก "Admin และ CEO" แล้วเปลี่ยนเป็น "HR และ CEO" (role `hr` มีอยู่แล้วในระบบแต่ยังไม่มีคนถือ) และสั่งเพิ่มการสร้างบัญชีใหม่เข้าไปด้วย ไม่ใช่แค่รีเซ็ต
+
+**ไฟล์ที่แก้ (ใน `haus-crm/`):**
+- **[lib/supabase/admin.ts](haus-crm/lib/supabase/admin.ts) (ใหม่)** — `createAdminClient()` service-role client ตัวแรกของแอป (`import "server-only"` กันเผลอ import จาก client component — ต้องลง `npm install server-only` เพิ่ม) lazy-read env เพื่อไม่ให้ build พังตอนยังไม่ตั้งค่า
+- **[lib/accounts.ts](haus-crm/lib/accounts.ts) (ใหม่)** — `getAccounts()` อ่าน `main_1_hr` ทุกแถว (`p_select using(true)` อยู่แล้ว ไม่ใช่ช่องโหว่ใหม่) คืน `hasAccount` boolean ไม่ส่ง `auth_user_id` ดิบออกไป client
+- **[lib/mutations/accounts.ts](haus-crm/lib/mutations/accounts.ts) (ใหม่)** — `resetUserPassword` + `createUserAccount` เช็ค `people.manage_accounts` ก่อนทุกครั้งผ่าน session client แล้วค่อยเรียก `createAdminClient().auth.admin.*` เขียน `audit_log` ทั้งคู่ (ไม่เก็บรหัสผ่านเด็ดขาด)
+- **[components/AccountsManager.tsx](haus-crm/components/AccountsManager.tsx) (ใหม่)** — list พนักงานใน `/settings` → section "บัญชีผู้ใช้" ต่อแถว: มีบัญชีแล้ว → ปุ่มรีเซ็ตรหัส, ยังไม่มี → ปุ่มสร้างบัญชี (กรอกอีเมล+รหัสเริ่มต้น)
+- แก้ `SettingsView.tsx` / `settings/page.tsx` / `lib/nav.ts` (เติม perm ในเมนู "ตั้งค่า") / `lib/rbac.ts` (เอกสาร permission + เติมให้ role `hr`)
+
+**Permission ใหม่**: `people.manage_accounts` (กลุ่ม `people`) — grant ให้ `ceo`, `hr`, `system_admin` เท่านั้น **ไม่ให้ `admin`** (business role ที่ยังไม่มีคนถือ, Ben ไม่ได้หมายถึงตัวนี้) ทั้ง migration ตรง (`add_people_manage_accounts_permission`, apply บน production แล้ว) และ `db/supabase_full_setup.sql` (สำหรับ setup ใหม่ในอนาคต — `system_admin` ไม่ได้อยู่ในไฟล์ setup เพราะสร้างนอกรอบตอน provision บัญชีจริง ต้องจำ insert เองถ้า setup ใหม่)
+
+**สิ่งที่ค้นพบระหว่างวางแผน (สำคัญถ้าจะเพิ่ม permission ใหม่อีกในอนาคต)**: บัญชี "Admin" (E-001) ที่ใช้ทดสอบกันอยู่ใช้ role **`system_admin`** ไม่ใช่ role `admin` — `system_admin` มี 35/35 สิทธิ์ (ตอนนี้ 36/36) **แบบ insert ตายตัวตอนสร้างบัญชี ไม่ใช่ wildcard** ต่างจาก `ceo` ที่ตอน seed ครั้งแรกใช้ `select 'ceo', key from permissions` (แต่หลัง seed ก็กลายเป็น insert ตายตัวเหมือนกัน) — **permission ใหม่ทุกตัวต้อง insert ให้ `system_admin` ตรงๆ ไม่งั้นจะไม่ได้สิทธิ์อัตโนมัติ แม้จะตั้งใจให้เป็น "ทุกสิทธิ์เสมอ"**
+
+**วิธีทดสอบที่ใช้**: login เป็น E-001 จริงผ่าน `browser-automation` → สร้างบัญชีให้ Pai (SP-003, ลาออก, ไม่เคยมีบัญชี) ด้วยอีเมลทดสอบ → เช็ค `main_1_hr.auth_user_id` ผูกจริง + `audit_log` มีแถว `action='create_account'` ถูกต้อง → รีเซ็ตรหัสผ่าน Mhow เป็นรหัสชั่วคราว → **login จริงด้วยรหัสใหม่ยืนยันว่าใช้ได้** → รีเซ็ตกลับเป็นรหัสเดิมผ่านฟีเจอร์เดียวกัน → ลบบัญชีทดสอบของ Pai ด้วย Admin REST API ตรง (`DELETE /auth/v1/admin/users/{id}` ผ่านสคริปต์ one-off ที่ลบทิ้งหลังรันเสร็จ — `@supabase/supabase-js` เรียกไม่ได้จาก plain `node` บน Node 20 เพราะ realtime client ต้องการ native `WebSocket` ซึ่งมีแค่ Node 22+ ใช้ REST ตรงเลี่ยงปัญหานี้ได้) → คืนอีเมลเดิมของ Pai (`Elvin.satayu@gmail.com`, เจอจากไฟล์ `import/HR Sheet - Employee Lists.csv` เพราะตอนแรกลืมจดค่าก่อนทับ)
+
+**ยังไม่ทำ (บันทึกไว้กันลืม)**:
+- **`SUPABASE_SERVICE_ROLE_KEY` ตั้งไว้แค่ `.env.local` ในเครื่อง** — ต้องไปตั้งใน Vercel ด้วย (Settings → Environment Variables) ไม่งั้น production เรียกฟีเจอร์นี้ไม่ได้เลย (throw error ชัดเจนแทนที่จะพังเงียบๆ ตามที่ออกแบบไว้ แต่ก็ยังใช้งานไม่ได้อยู่ดีจนกว่าจะตั้งค่า)
+- ยังไม่ได้ทดสอบ negative case (เรียก `resetUserPassword`/`createUserAccount` ตรงๆ ตอน login เป็นคนไม่มีสิทธิ์) แบบ live — เชื่อตาม pattern เดียวกับ `updateListing` ที่ทดสอบแล้วใน Phase 5 ข้อ 1 (permission check ก่อนแตะ DB เสมอ) แต่ยังไม่ได้ exploit-test ฟีเจอร์นี้ตรงๆ
+- ไม่มีปุ่มลบบัญชี (auth) ในหน้านี้ — ถ้าต้องการ offboard คนออกจริงต้องทำ SQL ตรงหรือเพิ่มฟีเจอร์แยก
+
+**ขั้นต่อไปตอนกลับมาทำ**: ถาม Ben ว่าจะ commit/push เลยไหม (เหมือนรอบ Phase 5 ข้อ 1) → เตือนให้ตั้ง `SUPABASE_SERVICE_ROLE_KEY` ใน Vercel → กลับไปทำ Phase 5 ข้อ 2 ต่อ
+
+---
 
 ### ✅ เสร็จ 2026-08-07: Phase 5 ข้อ 1 — เขียนจริงหน้าแก้ไขทรัพย์ (`ListingEditSheet`)
 **นี่คือ write ตัวแรกของทั้งแอป** — ตอนก่อนหน้านี้ทั้งโค้ดเบสไม่มี `.insert()/.update()/.delete()` หรือ `"use server"` เลยสักที่ ยังไม่ push ไปยัง git
@@ -176,10 +201,9 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 
 **ยังไม่ทำ (บันทึกไว้กันลืม)**:
 - ยังไม่ backfill `main_9_support_log.support_id` (เป็น null เหมือนเดิม — ต้อง query แบบ heuristic ถ้าจะทำ แยกเป็นงานเดี่ยว)
-- **ยังไม่ commit/push** ทั้ง `haus-crm` (โค้ด) และ repo แม่ (CLAUDE.md นี้) — ของยังอยู่ในเครื่องเท่านั้น
 - Phase 5 ข้อ 2-6 (แก้ลีด/เพิ่มลีด/มอบหมาย/เพิ่มทรัพย์/ติ๊กงาน) ยังไม่เริ่ม — ใช้ pattern เดียวกับข้อ 1 ได้เลย (server action ใน `lib/mutations/*.ts` + re-fetch แถวจริงก่อน diff + audit_log + revalidatePath)
 
-**ขั้นต่อไปตอนกลับมาทำ**: ถาม Ben ว่าจะ commit/push `haus-crm` เลยไหม → เริ่ม Phase 5 ข้อ 2 (แก้ลีด/เปลี่ยนสเตจ ใน `LeadEditSheet` หรือชื่อ component ที่ใกล้เคียง — ยังไม่ได้เปิดดูไฟล์จริง)
+**อัปเดต**: commit/push ทั้ง `haus-crm` และ repo แม่แล้วในวันเดียวกัน (2026-08-07) — ดูหัวข้อ "หน้าจัดการบัญชีผู้ใช้" ด้านบนสำหรับงานล่าสุดถัดจากนี้
 
 ---
 
@@ -199,7 +223,7 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 - **role `marketing` ยังแก้ราคาทรัพย์ได้ผ่าน DB โดยตรง (RLS)** — RLS กรองแถวไม่ได้กรองคอลัมน์ ยังจริงอยู่ในระดับ DB (ต้องทำ RPC เฉพาะคอลัมน์การตลาดถ้าจะปิดที่ต้นทาง) **แต่ผ่าน `updateListing` (Phase 5 ข้อ 1) ปิดแล้วที่ชั้นแอป** — เส้นทางเขียนอื่นในอนาคต (ถ้ามี) ต้องกรองเองซ้ำแบบเดียวกัน อย่าลืม
 - **`v_sale_status` เป็น security_invoker** → เซลเห็นเลขตัวเอง คนอื่นเป็น 0 ถ้า Ben อยากได้กระดานผลงานทั้งทีมต้องทำ view แยกแบบ security definer
 - **หน้า "ทรัพย์" จะว่างสำหรับ Marketing/Admin/HR** (ไม่ได้ดูแลทรัพย์เอง) — ตั้งใจตามดีไซน์ แต่ถ้า support อยากเห็นทั้งหมดในหน้าแรกด้วย แก้ที่ `getMyListings()` บรรทัดเดียว
-- ยังไม่มีหน้าจัดการบัญชีสำหรับ Admin (ต้องมี server route ถือ `service_role` + gate ด้วย `people.manage`)
+- ~~ยังไม่มีหน้าจัดการบัญชีสำหรับ Admin~~ ✅ เสร็จ 2026-08-08 — ดู Phase 7
 
 ## งานที่ยังค้าง (TODO)
 
@@ -237,7 +261,7 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
   - ทดสอบด้วยเบราว์เซอร์จริงแล้ว: login เป็น Q → เข้า `/` ได้ · sidebar ขึ้น "Q · Agent (Sales)" · **ไม่มีปุ่ม "ดูในมุมมอง"** (ไม่มี `roles.manage`) · เมนูเหลือเฉพาะของ agent (ไม่มี ตั้งค่า/ทีม/เว็บพอร์ทัล) · `/account` 200 · console error 0
   - ทุกหน้ากลายเป็น **dynamic** (ทิ้ง ISR 30 วิ) เพราะ layout อ่าน session — ถูกต้องแล้ว หน้าที่ cache ให้คนนึงห้ามเสิร์ฟให้อีกคน
 - [x] **หน้าเปลี่ยนรหัสผ่าน** — `/account` ([AccountSettings](haus-crm/components/AccountSettings.tsx)) เข้าจากเมนูผู้ใช้ใน sidebar. **เช็ครหัสเดิมก่อนเปลี่ยนเสมอ** (Supabase ไม่บังคับ ทำให้คอมที่ลืม logout เปลี่ยนรหัสเจ้าของบัญชีได้)
-- [ ] **ยังไม่มีหน้าจัดการบัญชีสำหรับ Admin** — ตั้ง/รีเซ็ตรหัสให้คนอื่นต้องมี server route ที่ถือ `service_role` key (ห้าม `NEXT_PUBLIC_`) + gate ด้วย `people.manage`
+- [x] **หน้าจัดการบัญชีสำหรับ Admin** — เสร็จ 2026-08-08 ดู Phase 7
 - [x] **ย้าย `lib/queries.ts` ไป session-aware client แล้ว 2026-08-03** ([lib/supabase/server.ts](haus-crm/lib/supabase/server.ts)) — **ลบ `lib/supabase.ts` (anon client ไร้ session) ทิ้งแล้ว** ไม่ได้แค่เลิกใช้ เพราะถ้าปล่อยไว้ call site ต่อไปที่หยิบไปใช้จะได้ผลลัพธ์ว่างเปล่าเงียบ ๆ แทนที่จะ error
 - [x] **ปิดรูรั่วเงินเดือน/PII แล้ว 2026-08-03** — RLS กรองได้แค่ "แถว" กรอง "คอลัมน์" ไม่ได้ จึงใช้ **GRANT ระดับคอลัมน์**: ถอน `select` ทั้งตารางจาก `anon`+`authenticated` แล้ว grant กลับเฉพาะคอลัมน์ที่ไม่อ่อนไหว
   - **ไม่ให้ใครแตะผ่าน API เลย**: `salary` `commission` `id_card_no` `kbank_account` `payslip_drive` `agreement_files`

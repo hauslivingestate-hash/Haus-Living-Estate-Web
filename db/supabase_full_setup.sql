@@ -438,6 +438,7 @@ insert into permissions (key, group_key, group_label, label, hint, sort_order) v
   ('teams.manage','people','บุคคล','จัดการทีมขาย','สร้างทีม กำหนดหัวหน้า และมอบหมายเซลเข้าทีม',82),
   ('leave.request','people','บุคคล','ขอลา','ยื่นใบลาจากหน้าแผนวันนี้',83),
   ('leave.manage','people','บุคคล','อนุมัติ / จัดการวันลา','ดูใบลาทุกคนและอนุมัติ — CEO / HR',84),
+  ('people.manage_accounts','people','บุคคล','จัดการบัญชีผู้ใช้ (สร้าง/ตั้งรหัสผ่าน)','สร้างบัญชี login ใหม่ + รีเซ็ตรหัสผ่าน — เข้าถึงบัญชี auth โดยตรง CEO / HR เท่านั้น',85),
   ('masterdata.govern','masterdata','ข้อมูลหลัก','จัดการโซน & เทมเพลตกิจกรรม/KPI','โซน · ประเภทกิจกรรม · เทมเพลต KPI — CEO/หัวหน้า',90),
   ('reference.manage','masterdata','ข้อมูลหลัก','จัดการรายการอ้างอิง (ประเภททรัพย์ / ช่องทาง / ฟิลด์ Lead)','ประเภททรัพย์ · Marketing Channel · Contact By · เพศ · สัญชาติ',91),
   ('checklists.manage','masterdata','ข้อมูลหลัก','จัดการเช็คลิสต์ทรัพย์ (A-List / Exclusive)','เทมเพลตงานเพิ่มมูลค่าทรัพย์เด่น — CEO / Listing Support',92),
@@ -494,7 +495,10 @@ insert into role_permissions (role_id, permission_key) values
 
   ('hr','people.manage'),('hr','people.view_sensitive'),
   ('hr','financials.view_comp'),('hr','financials.payroll'),
-  ('hr','performance.view_team'),('hr','leave.request'),('hr','leave.manage');
+  ('hr','performance.view_team'),('hr','leave.request'),('hr','leave.manage'),
+  ('hr','people.manage_accounts');
+-- `system_admin` ไม่ได้อยู่ในไฟล์นี้ (สร้างนอกรอบตอน provision บัญชีจริง, ดู CLAUDE.md) —
+-- ถ้า setup ใหม่หมดและสร้าง system_admin ซ้ำ ต้องเพิ่ม role_permissions ให้มันครบทุกตัวเอง
 
 -- user_roles + teams เว้นว่างไว้ — ต้องรอ import main_1_hr ของจริงก่อน
 -- (ตอนนี้ในตารางเป็นข้อมูล demo, ทีมจริงยังไม่ยืนยัน)
