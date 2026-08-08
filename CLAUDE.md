@@ -180,6 +180,17 @@ Ben สั่งเพิ่มระหว่างคุยกันว่า�
 
 **ขั้นต่อไปตอนกลับมาทำ**: ถาม Ben ว่าจะ commit/push เลยไหม (เหมือนรอบ Phase 5 ข้อ 1) → เตือนให้ตั้ง `SUPABASE_SERVICE_ROLE_KEY` ใน Vercel → กลับไปทำ Phase 5 ข้อ 2 ต่อ
 
+### ✅ เสร็จ 2026-08-08 (ต่อเนื่องจากด้านบน): ปิดหน้า `/account` (เปลี่ยนรหัสผ่านตัวเอง) เหลือแค่ CEO/HR/Admin
+Ben เห็นหน้า `/account` บน production (login เป็น Golf ธรรมดา) แล้วสั่งให้เอาออกยกเว้น 3 ตำแหน่งที่แก้บัญชีคนอื่นได้อยู่แล้ว — ใช้ permission ตัวเดียวกับด้านบน (`people.manage_accounts`) เป็นตัวกรอง ไม่ได้สร้างใหม่
+
+**ไฟล์ที่แก้:**
+- **[app/(app)/account/page.tsx](haus-crm/app/(app)/account/page.tsx)** — เพิ่ม `if (!auth.permissions.includes("people.manage_accounts")) redirect("/")` (เดิมคอมเมนต์บอกไว้ตรงๆ ว่า "No permission gate: every account owns itself" — ทับ logic เดิมนั้นตามที่ Ben สั่ง)
+- **[components/Sidebar.tsx](haus-crm/components/Sidebar.tsx)** — ซ่อนลิงก์ "บัญชีของฉัน" ทั้ง 2 จุด (การ์ดผู้ใช้แบบธรรมดา + dropdown ของคนที่มี `roles.manage`) ด้วยเช็คสิทธิ์เดียวกัน — **ปุ่ม "ออกจากระบบ" ไม่กระทบ** เพราะเป็นปุ่มแยกอยู่แล้วในทั้ง 2 เลย์เอาต์ ไม่ได้ผูกกับหน้า `/account`
+
+**ผลที่ตามมาที่ Ben ควรรู้**: ตอนนี้มีแค่ **Stone (CEO)** กับ **E-001 (Admin/system_admin)** ที่เปลี่ยนรหัสผ่านตัวเองได้ — **role `hr` ยังไม่มีคนถือ** เลยไม่มีใครใช้สิทธิ์นี้ในทางปฏิบัติอีกคน จนกว่าจะมีคนได้รับมอบ role นี้จริง พนักงานที่เหลือทั้งหมด (Agent/Listing Support/Marketing) ลืมรหัสผ่านแล้วต้องให้ Stone หรือ Admin (E-001) รีเซ็ตให้ผ่าน `/settings` → บัญชีผู้ใช้ แทนที่จะเปลี่ยนเองได้
+
+**ทดสอบแล้ว**: login เป็น Mhow (agent) → ไม่เห็นลิงก์ "บัญชีของฉัน" ใน sidebar + ยิง URL `/account` ตรงๆ โดน redirect กลับ `/` ทันที · login เป็น E-001 → เห็นลิงก์ปกติ + เข้าหน้าได้ + เห็นฟอร์มเปลี่ยนรหัสผ่านปกติ
+
 ---
 
 ### ✅ เสร็จ 2026-08-07: Phase 5 ข้อ 1 — เขียนจริงหน้าแก้ไขทรัพย์ (`ListingEditSheet`)
