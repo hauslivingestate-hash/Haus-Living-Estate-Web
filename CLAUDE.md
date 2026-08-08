@@ -21,10 +21,10 @@
 | สิทธิ์ | ✅ RBAC อยู่ใน DB — **36 สิทธิ์** · 8 บทบาท · ผูกกับพนักงานจริงแล้ว |
 | DB | ✅ 54 ตาราง · เงินเดือน/PII ล็อกแล้ว · +2 function (`create_owner` ดู Phase 5 ข้อ 1, `people.manage_accounts` เป็น permission ไม่ใช่ function — ดู Phase 7) |
 | ความปลอดภัย | ✅ **RLS Phase 4 ปิดครบแล้ว** — `demo_read_all` + anon ถูกถอนหมด (ดูรายละเอียดใต้ Phase 4) |
-| ⚠️ การบันทึก | 🟡 **เริ่มแล้ว 1/6 — แก้ทรัพย์เขียนจริงแล้ว** ที่เหลือ (แก้ลีด/เพิ่มลีด/มอบหมาย/เพิ่มทรัพย์/ติ๊กงาน) ยัง stub (ดู Phase 5) |
+| ⚠️ การบันทึก | 🟡 **เริ่มแล้ว 2/6 — แก้ทรัพย์ + แก้ลีด/แท็ก/ข้อร้องเรียนเขียนจริงแล้ว** ที่เหลือ (เพิ่มลีด/มอบหมาย/เพิ่มทรัพย์/ติ๊กงาน) ยัง stub (ดู Phase 5) |
 
 ### งานถัดไปตามลำดับ (ดูรายละเอียดเต็มที่ 🗺️ แผนเฟส ด้านล่าง)
-1. **Phase 5 (Write path)** — ต่อปุ่ม save ทุกหน้า: ~~แก้ทรัพย์~~ ✅ → **แก้ลีด/เปลี่ยนสเตจ (ถัดไป)** → เพิ่มลีด → มอบหมายลีด → เพิ่มทรัพย์ → ติ๊กงาน `/today`
+1. **Phase 5 (Write path)** — ต่อปุ่ม save ทุกหน้า: ~~แก้ทรัพย์~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ~~ ✅ → **เพิ่มลีด (ถัดไป)** → มอบหมายลีด → เพิ่มทรัพย์ → ติ๊กงาน `/today`
 2. **Phase 6** — เชื่อมหน้าที่ยังอ่านจาก seed ในโค้ด (~9 หน้า: `/` `/today` `/contacts` `/projects` `/last-match` `/team` `/leave` `/new-sales` `/website`) ให้ query DB จริง
 3. หน้าตั้งค่าโซนในเว็บยังเป็น 1 โซน 1 เซล ต้องแก้ให้รองรับหลายคน (DB รองรับแล้วผ่าน `zone_sales`)
 4. ~~หน้าจัดการบัญชีสำหรับ Admin~~ ✅ เสร็จ 2026-08-08 — ดู Phase 7
@@ -130,12 +130,12 @@ price_remark, unit_condition, close_type
 | **7** | **งานแอดมิน/ops ที่ยังไม่มีที่ทำ** | 🟡 บางส่วน |
 | **8** | **ฟีเจอร์แยก (มีเอกสารของตัวเอง)** | ⬜ ยังไม่เริ่ม |
 
-### เฟส 5 — Write path (ต่อปุ่ม save) 🟡 เริ่มแล้ว 1/6
-**ทุกปุ่มบันทึกเคยเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย — **ข้อ 1 เขียนจริงแล้ว 2026-08-07** (ดูรายละเอียดที่ 🔖 ค้างอยู่ตรงนี้ ด้านบน)
+### เฟส 5 — Write path (ต่อปุ่ม save) 🟡 เริ่มแล้ว 2/6
+**ทุกปุ่มบันทึกเคยเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย — **ข้อ 1 เขียนจริงแล้ว 2026-08-07 · ข้อ 2 เขียนจริงแล้ว 2026-08-08** (รายละเอียดข้อ 2 ที่ 🔖 ค้างอยู่ตรงนี้ ด้านบน)
 - ✅ **ข่าวดี: policy ฝั่ง DB พร้อมแล้ว** — เฟส 4 เขียน insert/update/delete ครบทุกตาราง ต่อ write ได้เลยไม่โดน 403 (ยกเว้น edge case `main_2_owner` insert ใหม่ที่ต้องผ่าน RPC `create_owner` — ดูด้านบน)
-- เรียงตามความคุ้ม: ~~แก้ทรัพย์ (`ListingEditSheet`)~~ ✅ → **แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet`) — ถัดไป** → เพิ่มลีด (`LeadIntakeFab`) → มอบหมายลีด (`/assign`) → เพิ่มทรัพย์ (`ListingIntakeButton`) → ติ๊กงาน `/today` (เขียน `tasks` + `activities`)
-- ทุกจุดต้องเขียน `audit_log` ด้วย (`changed_by` = ตัวเอง ไม่งั้น policy ปฏิเสธ) — pattern อยู่ใน [lib/mutations/listings.ts](haus-crm/lib/mutations/listings.ts) แล้ว ก็อบโครงได้เลย
-- `main_6_buyer_crm.tag_id` มีคอลัมน์แล้วแต่แอปยังเก็บแท็กใน `NewLeadsProvider` — ย้ายมาเขียนจริงตอนนี้
+- เรียงตามความคุ้ม: ~~แก้ทรัพย์ (`ListingEditSheet`)~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet` + แท็ก + ข้อร้องเรียน)~~ ✅ → **เพิ่มลีด (`LeadIntakeFab`) — ถัดไป** → มอบหมายลีด (`/assign`) → เพิ่มทรัพย์ (`ListingIntakeButton`) → ติ๊กงาน `/today` (เขียน `tasks` + `activities`)
+- ทุกจุดต้องเขียน `audit_log` ด้วย (`changed_by` = ตัวเอง ไม่งั้น policy ปฏิเสธ) — pattern อยู่ใน [lib/mutations/listings.ts](haus-crm/lib/mutations/listings.ts) และ [lib/mutations/leads.ts](haus-crm/lib/mutations/leads.ts) แล้ว ก็อบโครงได้เลย
+- ~~`main_6_buyer_crm.tag_id` มีคอลัมน์แล้วแต่แอปยังเก็บแท็กใน `NewLeadsProvider`~~ ✅ เขียนจริงแล้ว (ข้อ 2)
 
 ### เฟส 6 — เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง 🔴
 `/` แดชบอร์ด · `/today` แผนวันนี้ · `/contacts` · `/projects` · `/last-match` · `/team` · `/leave` · `/new-sales` · `/website` — ทั้งหมดยังอ่านจาก seed ใน `lib/*.ts`
@@ -156,6 +156,27 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 ---
 
 ## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-08)
+
+### ✅ เสร็จ 2026-08-08: Phase 5 ข้อ 2 — เขียนจริงหน้าลีด (แก้ลีด + แท็ก + ข้อร้องเรียน)
+Ben เลือกเอาครบทั้ง 3 จุดเขียนของหน้าลีดในรอบเดียว (ไม่ใช่แค่ฟอร์มแก้ไขหลัก) — ใหญ่กว่าที่ชื่อ "แก้ลีด" ฟังดู เพราะแท็ก+ข้อร้องเรียนผูกกับ `NewLeadsProvider` (store กลางที่ตาราง `/leads` ก็ใช้ร่วม) ไม่ใช่แค่คอมโพเนนต์เดียว
+
+**ไฟล์ที่แก้ (ใน `haus-crm/`):**
+- **[lib/mutations/leads.ts](haus-crm/lib/mutations/leads.ts) (ใหม่)** — `"use server"` `updateLead` (8 ฟิลด์หลัก) · `setLeadTag` · `setLeadComplaint` — pattern เดียวกับ `lib/mutations/listings.ts` ทุกตัวเช็คสิทธิ์ + re-fetch แถวจริงก่อน diff + เขียน `audit_log`
+- **[lib/queries.ts](haus-crm/lib/queries.ts)** — `CrmRow`/`getCrm()`/`getLead()` ไม่เคย select `tag_id`/`customer_complain`/`complain_status`/`complain_remark` เลยตั้งแต่แรก ต้องเพิ่มก่อนถึงจะมีค่าจริงส่งลง component แทน seed ได้
+- **[lib/leads.ts](haus-crm/lib/leads.ts)** — `COMPLAINT_STATUSES` แก้จากไทย (`เปิด`/`กำลังแก้ไข`/`ปิด`) เป็นอังกฤษ (`Open`/`In Progress`/`Resolved`/`Closed`) ให้ตรง lookup table จริงใน DB (มี FK) — ค่าเดิมจะชน FK violation ทันทีถ้าเขียนจริง
+- **[components/LeadEditSheet.tsx](haus-crm/components/LeadEditSheet.tsx)** — `submit()` เรียก `updateLead` จริง (เดิม `console.log`)
+- **[components/LeadTagRow.tsx](haus-crm/components/LeadTagRow.tsx)** (หน้า detail) + **[components/LeadsBrowser.tsx](haus-crm/components/LeadsBrowser.tsx)** (ตาราง, 3 จุดที่เคยเรียก `tagOf()`) — เปลี่ยนมาอ่าน `tag_id` จริงจาก `crm`/`lead` prop แทน seed สุ่ม · ตารางมี optimistic local override (`tagOverride`) กัน UI กระตุกตอนติ๊กแท็ก แล้ว `router.refresh()` sync ความจริงกลับมา
+- **[components/LeadAdminPanel.tsx](haus-crm/components/LeadAdminPanel.tsx)** — รับ complaint fields เป็น prop แทน `processOf()` เพิ่ม textarea "รายละเอียดข้อร้องเรียน" ผูก `customer_complain` (คอลัมน์มีมาตั้งแต่ 2026-08-03 แต่ UI เดิมไม่มีช่องกรอกเลย) มีปุ่ม "บันทึก" แยก (เดิม auto-save ทุก keystroke ลง provider เฉยๆ)
+- **[app/(app)/leads/[id]/page.tsx](haus-crm/app/(app)/leads/[id]/page.tsx)** — ส่ง `tag_id`/complaint fields ลง 2 คอมโพเนนต์ข้างบน
+- **[components/NewLeadsProvider.tsx](haus-crm/components/NewLeadsProvider.tsx)** — ลบ `tagOf`/`setTag`/`processOf`/`setProcess`/`tags`/`process` ทิ้ง (ตายแล้ว) เหลือ `addLead`/`assign`/`historyOf` ไว้สำหรับ Phase 5 ข้อ 3-4
+
+**พบระหว่างทำ (บันทึกไว้ ไม่ใช่บั๊กที่งานนี้สร้าง)**: role `listing_support` มี `leads.assign` แต่ไม่มีทั้ง `leads.view_all`/`leads.view_own` — ถ้าเข้า `/leads/[id]` ตรงๆ (ไม่ผ่าน `/assign`) RLS SELECT อาจบล็อกไม่เห็นลีดเลย มีมาตั้งแต่ก่อนงานนี้
+
+**ทดสอบแล้ว**: login เป็น Mhow (S-004, agent) → แก้ budget ลีดของตัวเอง (`L26-018`) + ตั้งแท็ก → เช็ค DB + `audit_log` ตรง (`changed_by='S-004'`) → login เป็น E-001 (system_admin) → เปิดข้อร้องเรียน กรอกรายละเอียด+สถานะ+หมายเหตุ → บันทึก → เช็ค DB ตรง (`complain_status='In Progress'`, `changed_by='E-001'`) → ปิดข้อร้องเรียนคืน (ทุกฟิลด์กลับเป็น null) → **คืนค่า budget/tag_id ของ `L26-018` กลับเป็น null ด้วย SQL ตรง** (ไม่มี UI ล้างค่าฟิลด์เหล่านี้ให้ในฟอร์ม)
+
+**ขั้นต่อไปตอนกลับมาทำ**: ถาม Ben ว่าจะ commit/push เลยไหม → Phase 5 ข้อ 3 (เพิ่มลีด, `LeadIntakeFab`) ต่อ
+
+---
 
 ### ✅ เสร็จ 2026-08-08: หน้าจัดการบัญชีผู้ใช้ (สร้าง/รีเซ็ตรหัสผ่าน) — CEO/HR เท่านั้น
 Ben สั่งเพิ่มระหว่างคุยกันว่าเหลืออะไรบ้าง — ครั้งแรกบอก "Admin และ CEO" แล้วเปลี่ยนเป็น "HR และ CEO" (role `hr` มีอยู่แล้วในระบบแต่ยังไม่มีคนถือ) และสั่งเพิ่มการสร้างบัญชีใหม่เข้าไปด้วย ไม่ใช่แค่รีเซ็ต
