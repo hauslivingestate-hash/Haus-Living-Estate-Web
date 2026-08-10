@@ -37,7 +37,8 @@
 ### รอจากคน
 - **HR**: `date_started` ของพนักงานทุกคน (ชีทไม่มี → ladder เซลใหม่ + โควตาลาปีแรกใช้ไม่ได้) · โควตาวันลาจริง (ที่ใส่ไว้เป็นขั้นต่ำตามกฎหมาย ซึ่งผิดแน่ เพราะ 5/8 คนใช้เกินแล้ว)
 - **CEO**: ใครเป็นหัวหน้าทีม (ยังไม่มีใครถือ role `sales_leader`, ตาราง `teams` ว่าง) · แท็ก Lead จริง (ตอนนี้ seed ไว้ 4 อัน)
-- **Ben**: ปิด **Vercel Deployment Protection** ถึงจะเปิดเว็บจาก URL สาธารณะได้ (ตอนนี้ Vercel ตีกลับก่อนถึงแอป)
+- ~~**Ben**: ปิด Vercel Deployment Protection~~ ✅ ไม่ค้างแล้ว — เปลี่ยนเป็น Standard Protection ตั้งแต่ 2026-08-03 (เช็คซ้ำ 2026-08-10: `haus-crm-iota.vercel.app/login` ตอบ 200 ไม่เด้ง SSO)
+- ~~**Ben**: ตั้ง `SUPABASE_SERVICE_ROLE_KEY` ใน Vercel~~ ✅ เสร็จ 2026-08-10 (+ redeploy แล้ว — ดูรายละเอียดใต้หัวข้อหน้าจัดการบัญชี)
 
 ---
 
@@ -266,7 +267,7 @@ Ben สั่งเพิ่มระหว่างคุยกันว่า�
 - ยังไม่ได้ทดสอบ negative case (เรียก `resetUserPassword`/`createUserAccount` ตรงๆ ตอน login เป็นคนไม่มีสิทธิ์) แบบ live — เชื่อตาม pattern เดียวกับ `updateListing` ที่ทดสอบแล้วใน Phase 5 ข้อ 1 (permission check ก่อนแตะ DB เสมอ) แต่ยังไม่ได้ exploit-test ฟีเจอร์นี้ตรงๆ
 - ไม่มีปุ่มลบบัญชี (auth) ในหน้านี้ — ถ้าต้องการ offboard คนออกจริงต้องทำ SQL ตรงหรือเพิ่มฟีเจอร์แยก
 
-**ขั้นต่อไปตอนกลับมาทำ**: ถาม Ben ว่าจะ commit/push เลยไหม (เหมือนรอบ Phase 5 ข้อ 1) → เตือนให้ตั้ง `SUPABASE_SERVICE_ROLE_KEY` ใน Vercel → กลับไปทำ Phase 5 ข้อ 2 ต่อ
+*(หมายเหตุ: "ขั้นต่อไป" ของหัวข้อนี้ทำครบหมดแล้ว — commit/push แล้ว · ตั้ง service_role key ใน Vercel แล้ว · Phase 5 ข้อ 2-4 เสร็จแล้ว)*
 
 ### ✅ เสร็จ 2026-08-08 (ต่อเนื่องจากด้านบน): ปิดหน้า `/account` (เปลี่ยนรหัสผ่านตัวเอง) เหลือแค่ CEO/HR/Admin
 Ben เห็นหน้า `/account` บน production (login เป็น Golf ธรรมดา) แล้วสั่งให้เอาออกยกเว้น 3 ตำแหน่งที่แก้บัญชีคนอื่นได้อยู่แล้ว — ใช้ permission ตัวเดียวกับด้านบน (`people.manage_accounts`) เป็นตัวกรอง ไม่ได้สร้างใหม่
@@ -434,10 +435,11 @@ Ben เห็นหน้า `/account` บน production (login เป็น Go
 
 - **เอกสารส่งมอบอยู่ในโฟลเดอร์แอป** อ่านตามลำดับนี้: [DATA_MODEL.md](haus-crm/DATA_MODEL.md) (บล็อก HANDOVER บนสุด) → [HANDOVER_CHECKLIST.md](haus-crm/HANDOVER_CHECKLIST.md) → [CEO_FEEDBACK_R1.md](haus-crm/CEO_FEEDBACK_R1.md)
 - ⚠️ **เอกสาร 3 ไฟล์นั้นเขียนไว้ตอนเฟสออกแบบ — หลายอย่างล้าสมัยแล้ว** (ขนาดข้อมูล · "ไม่มี auth" · "ทุก state อยู่ใน memory") ให้เชื่อ CLAUDE.md ไฟล์นี้ก่อน แล้วใช้ 3 ไฟล์นั้นดู**เหตุผลเบื้องหลังการออกแบบ** ซึ่งยังใช้ได้อยู่
-- **สิ่งที่ต่อของจริงแล้ว**: auth + session + สิทธิ์จาก DB · `/account` เปลี่ยนรหัส · อ่านข้อมูลจริงจาก `v_main_listing` / `main_6_buyer_crm` / `v_sale_status`
-- **สิ่งที่ยังเป็นของปลอม**: ทุกปุ่ม save (นอกจากเปลี่ยนรหัสผ่าน) · store ในหน้า ตั้งค่า/กิจกรรม/วันลา ยังเก็บใน React Provider (refresh แล้วหาย)
-- **RBAC ใน `lib/rbac.ts` = สเปก** ตอนนี้ย้ายเข้า DB แล้ว (ตาราง `roles`/`permissions`/`user_roles`) แต่ **ฝั่งแอปยังกรองแค่เมนู** — การป้องกันจริงต้องรอ RLS
-- **การตัดสินใจเรื่อง auth (Ben, 2026-08-03)**: login ด้วย **อีเมลส่วนตัว** (`main_1_hr.email` ไม่ใช่ `work_email`) และ **Admin ตั้งรหัสผ่านให้ user ได้** → ต้องมี server route ที่เรียก Supabase Admin API ด้วย `service_role` key (เก็บฝั่ง server เท่านั้น ห้าม `NEXT_PUBLIC_`) แล้ว gate ด้วย `people.manage` (ยังไม่ได้ทำ)
+- ⚠️ **3 บรรทัดล่างนี้เป็นสถานะ ณ 2026-08-03 ที่ตกยุคไปแล้ว — อัปเดต 2026-08-10:**
+- **สิ่งที่ต่อของจริงแล้ว**: auth + session + สิทธิ์จาก DB · `/account` เปลี่ยนรหัส · จัดการบัญชีผู้ใช้ · อ่านข้อมูลจริงทุกหน้าลีด/ทรัพย์ · **เขียนจริงแล้ว 4/6 จุดของ Phase 5** (แก้ทรัพย์ · แก้ลีด/แท็ก/ข้อร้องเรียน · เพิ่มลีด · มอบหมายลีด)
+- **สิ่งที่ยังเป็นของปลอม**: ปุ่ม save ที่เหลือ 2 จุด (เพิ่มทรัพย์ · ติ๊กงาน `/today`) · store ในหน้า ตั้งค่า/กิจกรรม/วันลา ยังเก็บใน React Provider (refresh แล้วหาย) · ~9 หน้าที่ยังอ่าน seed (Phase 6)
+- **RBAC ใน `lib/rbac.ts` = สเปก** ย้ายเข้า DB แล้ว (ตาราง `roles`/`permissions`/`user_roles`) และ ✅ **RLS ปิดครบแล้วตั้งแต่ Phase 4** — DB ปฏิเสธจริง ไม่ใช่แค่ UI ซ่อนเมนู
+- **การตัดสินใจเรื่อง auth (Ben, 2026-08-03)**: login ด้วย **อีเมลส่วนตัว** (`main_1_hr.email` ไม่ใช่ `work_email`) และ **Admin ตั้งรหัสผ่านให้ user ได้** → ✅ **ทำแล้ว 2026-08-08** ที่ `/settings` → บัญชีผู้ใช้ (gate ด้วย `people.manage_accounts` ไม่ใช่ `people.manage` ตามที่คุยกันทีหลัง) · service_role key เก็บฝั่ง server เท่านั้น + ตั้งใน Vercel แล้ว 2026-08-10
 - **เป็น git repo แยก** (remote: `github.com/hauslivingestate-hash/haus-crm`) — repo แม่ gitignore โฟลเดอร์นี้ไว้ ต้อง `cd haus-crm` ก่อนทำ git ของแอป
 - **Deploy = import repo เข้า Vercel** (Hobby plan) → auto-deploy ทุกครั้งที่ push `main`. env var ตั้งใน Vercel ได้แต่ **ไม่จำเป็น** เพราะ...
 - **Supabase config ใส่เป็น fallback ในโค้ดแล้ว** ([lib/supabase.ts](haus-crm/lib/supabase.ts)) — url + publishable(anon) key ฝังไว้ (ปลอดภัย เพราะเป็น public key + RLS ป้องกัน) แอปเลยรันได้เองไม่ต้องตั้ง env. ถ้าตั้ง `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` ใน Vercel จะ override ค่า fallback
