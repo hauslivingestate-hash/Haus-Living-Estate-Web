@@ -486,3 +486,119 @@ end;
 $$;
 
 revoke execute on function public.create_owner(text, text, text) from anon;
+
+
+-- ============================================================
+-- 13) เพิ่มเติม 2026-08-08 (Phase 5 ข้อ 3 — ฟอร์มเพิ่มลีด) — สร้างลีดใหม่
+--     รับลีด 1 ครั้ง = เขียน 2 แถว: main_5_lead_database (บันทึกตอนรับ, trigger สร้าง
+--     lead_id ให้) + main_6_buyer_crm (แถวที่เซลทำงานด้วย) ผูกกันด้วย lead_ref
+--     ทำจาก client ไม่ได้เพราะต้อง `insert ... returning lead_id` เพื่อรู้ id ที่ trigger
+--     สร้าง แต่ RETURNING โดน SELECT policy เช็คด้วย ซึ่งเป็น
+--       leads.view_all OR (leads.view_own AND sales_id = ตัวเอง)
+--     → admin ที่มอบลีดให้คนอื่น และ listing_support (ไม่มีทั้งคู่) จะมองไม่เห็นแถวที่
+--     ตัวเองเพิ่งเขียน ชน 42501 — กับดักเดียวกับ main_2_owner ทางแก้เดียวกัน
+--     insert ทั้ง 2 แถวอยู่ในฟังก์ชันเดียว = ทรานแซกชันเดียว ลีดครึ่งๆ กลางๆ เกิดไม่ได้
+--     รับ jsonb ไม่ใช่ param แยก ~18 ตัว เพราะฟิลด์ฟอร์มยังเพิ่มอีก + type boundary จริง
+--     อยู่ที่ TypeScript ฝั่ง server action
+-- ============================================================
+create or replace function public.create_lead(p jsonb)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_lead_id text;
+begin
+  if not (has_perm('leads.create') or has_perm('roles.manage')) then
+    raise exception 'insufficient permission' using errcode = '42501';
+  end if;
+
+  if coalesce(btrim(p->>'lead_name'), '') = '' then
+    raise exception 'lead_name is required' using errcode = '23514';
+  end if;
+
+  insert into main_5_lead_database (
+    date_received, lead_type, listing_code, lead_name, phone, line_id,
+    gender, nationality, remark, sales_id,
+    contact_date, contact_time, marketing_channel, contact_by
+  ) values (
+    coalesce((p->>'date_received')::date, current_date),
+    nullif(p->>'lead_type', ''),
+    nullif(p->>'listing_code', ''),
+    btrim(p->>'lead_name'),
+    nullif(btrim(coalesce(p->>'phone', '')), ''),
+    nullif(p->>'line_id', ''),
+    nullif(p->>'gender', ''),
+    nullif(p->>'nationality', ''),
+    nullif(p->>'remark', ''),
+    nullif(p->>'sale_id', ''),
+    nullif(p->>'contact_date', '')::date,
+    nullif(p->>'contact_time', '')::time,
+    nullif(p->>'marketing_channel', ''),
+    nullif(p->>'contact_by', '')
+  )
+  returning lead_id into v_lead_id;
+
+  -- ลีดใหม่เริ่มที่สเตจ 'Lead' / สถานะ 'Active' เสมอ — นี่คือสิ่งที่ทำให้ "เซลติดต่อลูกค้า
+  -- แล้วยัง" (derive จาก pipeline_stage) อ่านว่ายังไม่ติดต่อ จนกว่าจะมีคนขยับสเตจจริง
+  insert into main_6_buyer_crm (
+    lead_id, lead_ref, date_received, listing_code, lead_type, sale_id,
+    lead_name, phone, line_id, admin_remark, budget,
+    potential, lead_status, pipeline_stage,
+    marketing_channel, contact_by, gender, nationality, contact_date, contact_time,
+    interest_zone, interest_property_type, purpose, sell_reason
+  ) values (
+    v_lead_id, v_lead_id,
+    coalesce((p->>'date_received')::date, current_date),
+    nullif(p->>'listing_code', ''),
+    nullif(p->>'lead_type', ''),
+    nullif(p->>'sale_id', ''),
+    btrim(p->>'lead_name'),
+    nullif(btrim(coalesce(p->>'phone', '')), ''),
+    nullif(p->>'line_id', ''),
+    nullif(p->>'remark', ''),
+    nullif(p->>'budget', '')::numeric,
+    coalesce(nullif(p->>'potential', ''), 'New Lead'),
+    'Active',
+    'Lead',
+    nullif(p->>'marketing_channel', ''),
+    nullif(p->>'contact_by', ''),
+    nullif(p->>'gender', ''),
+    nullif(p->>'nationality', ''),
+    nullif(p->>'contact_date', '')::date,
+    nullif(p->>'contact_time', '')::time,
+    nullif(p->>'interest_zone', ''),
+    nullif(p->>'interest_property_type', ''),
+    nullif(p->>'purpose', ''),
+    nullif(p->>'sell_reason', '')
+  );
+
+  return v_lead_id;
+end;
+$$;
+
+revoke execute on function public.create_lead(jsonb) from anon;
+
+-- lookup ใหม่ 2 ตัวของฟอร์มลีด — ต้องมี policy ไม่งั้น rls_auto_enable() ของ Supabase
+-- บังคับเปิด RLS แล้วไม่มีใครอ่าน dropdown ได้เลย (กลุ่มเดียวกับ §2 "รายการอ้างอิง")
+do $do$
+declare t text;
+begin
+  foreach t in array array['lead_purpose','sell_reason'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists p_select on public.%I', t);
+    execute format('drop policy if exists p_insert on public.%I', t);
+    execute format('drop policy if exists p_update on public.%I', t);
+    execute format('drop policy if exists p_delete on public.%I', t);
+    execute format('create policy p_select on public.%I for select to authenticated using (true)', t);
+    execute format($f$create policy p_insert on public.%I for insert to authenticated
+      with check ((select has_perm('reference.manage')) or (select has_perm('masterdata.govern')) or (select has_perm('roles.manage')))$f$, t);
+    execute format($f$create policy p_update on public.%I for update to authenticated
+      using      ((select has_perm('reference.manage')) or (select has_perm('masterdata.govern')) or (select has_perm('roles.manage')))
+      with check ((select has_perm('reference.manage')) or (select has_perm('masterdata.govern')) or (select has_perm('roles.manage')))$f$, t);
+    execute format($f$create policy p_delete on public.%I for delete to authenticated
+      using ((select has_perm('reference.manage')) or (select has_perm('masterdata.govern')) or (select has_perm('roles.manage')))$f$, t);
+    execute format('revoke all on public.%I from anon', t);
+  end loop;
+end
+$do$;

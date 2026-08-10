@@ -19,12 +19,12 @@
 | ข้อมูล | ✅ import จากชีทครบ — ทรัพย์ **511** · ลีด **953** · โครงการ **308** · เจ้าของ **452** · กิจกรรม **2,334** · Last Match **56** · พนักงาน **10** · โซน **30** |
 | Login | ✅ ใช้งานจริง — **9 บัญชี** (พนักงาน 8 + Admin) · บังคับ login แล้ว · มีหน้าเปลี่ยนรหัส `/account` · **CEO/HR สร้าง/รีเซ็ตรหัสให้คนอื่นได้แล้วที่ ตั้งค่า → บัญชีผู้ใช้** |
 | สิทธิ์ | ✅ RBAC อยู่ใน DB — **36 สิทธิ์** · 8 บทบาท · ผูกกับพนักงานจริงแล้ว |
-| DB | ✅ 54 ตาราง · เงินเดือน/PII ล็อกแล้ว · +2 function (`create_owner` ดู Phase 5 ข้อ 1, `people.manage_accounts` เป็น permission ไม่ใช่ function — ดู Phase 7) |
+| DB | ✅ **56 ตาราง** (+`lead_purpose`/`sell_reason` 2026-08-10) · เงินเดือน/PII ล็อกแล้ว · +2 function (`create_owner` ดู Phase 5 ข้อ 1 · `create_lead` ดู Phase 5 ข้อ 3) |
 | ความปลอดภัย | ✅ **RLS Phase 4 ปิดครบแล้ว** — `demo_read_all` + anon ถูกถอนหมด (ดูรายละเอียดใต้ Phase 4) |
-| ⚠️ การบันทึก | 🟡 **เริ่มแล้ว 2/6 — แก้ทรัพย์ + แก้ลีด/แท็ก/ข้อร้องเรียนเขียนจริงแล้ว** ที่เหลือ (เพิ่มลีด/มอบหมาย/เพิ่มทรัพย์/ติ๊กงาน) ยัง stub (ดู Phase 5) |
+| ⚠️ การบันทึก | 🟡 **เริ่มแล้ว 3/6 — แก้ทรัพย์ + แก้ลีด/แท็ก/ข้อร้องเรียน + เพิ่มลีดเขียนจริงแล้ว** ที่เหลือ (มอบหมาย/เพิ่มทรัพย์/ติ๊กงาน) ยัง stub (ดู Phase 5) |
 
 ### งานถัดไปตามลำดับ (ดูรายละเอียดเต็มที่ 🗺️ แผนเฟส ด้านล่าง)
-1. **Phase 5 (Write path)** — ต่อปุ่ม save ทุกหน้า: ~~แก้ทรัพย์~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ~~ ✅ → **เพิ่มลีด (ถัดไป)** → มอบหมายลีด → เพิ่มทรัพย์ → ติ๊กงาน `/today`
+1. **Phase 5 (Write path)** — ต่อปุ่ม save ทุกหน้า: ~~แก้ทรัพย์~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ~~ ✅ → ~~เพิ่มลีด~~ ✅ → **มอบหมายลีด `/assign` (ถัดไป)** → เพิ่มทรัพย์ → ติ๊กงาน `/today`
 2. **Phase 6** — เชื่อมหน้าที่ยังอ่านจาก seed ในโค้ด (~9 หน้า: `/` `/today` `/contacts` `/projects` `/last-match` `/team` `/leave` `/new-sales` `/website`) ให้ query DB จริง
 3. หน้าตั้งค่าโซนในเว็บยังเป็น 1 โซน 1 เซล ต้องแก้ให้รองรับหลายคน (DB รองรับแล้วผ่าน `zone_sales`)
 4. ~~หน้าจัดการบัญชีสำหรับ Admin~~ ✅ เสร็จ 2026-08-08 — ดู Phase 7
@@ -130,10 +130,10 @@ price_remark, unit_condition, close_type
 | **7** | **งานแอดมิน/ops ที่ยังไม่มีที่ทำ** | 🟡 บางส่วน |
 | **8** | **ฟีเจอร์แยก (มีเอกสารของตัวเอง)** | ⬜ ยังไม่เริ่ม |
 
-### เฟส 5 — Write path (ต่อปุ่ม save) 🟡 เริ่มแล้ว 2/6
-**ทุกปุ่มบันทึกเคยเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย — **ข้อ 1 เขียนจริงแล้ว 2026-08-07 · ข้อ 2 เขียนจริงแล้ว 2026-08-08** (รายละเอียดข้อ 2 ที่ 🔖 ค้างอยู่ตรงนี้ ด้านบน)
-- ✅ **ข่าวดี: policy ฝั่ง DB พร้อมแล้ว** — เฟส 4 เขียน insert/update/delete ครบทุกตาราง ต่อ write ได้เลยไม่โดน 403 (ยกเว้น edge case `main_2_owner` insert ใหม่ที่ต้องผ่าน RPC `create_owner` — ดูด้านบน)
-- เรียงตามความคุ้ม: ~~แก้ทรัพย์ (`ListingEditSheet`)~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet` + แท็ก + ข้อร้องเรียน)~~ ✅ → **เพิ่มลีด (`LeadIntakeFab`) — ถัดไป** → มอบหมายลีด (`/assign`) → เพิ่มทรัพย์ (`ListingIntakeButton`) → ติ๊กงาน `/today` (เขียน `tasks` + `activities`)
+### เฟส 5 — Write path (ต่อปุ่ม save) 🟡 เริ่มแล้ว 3/6
+**ทุกปุ่มบันทึกเคยเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย — **ข้อ 1 เสร็จ 2026-08-07 · ข้อ 2 เสร็จ 2026-08-08 · ข้อ 3 เสร็จ 2026-08-10** (รายละเอียดที่ 🔖 ค้างอยู่ตรงนี้ ด้านบน)
+- ✅ **ข่าวดี: policy ฝั่ง DB พร้อมแล้ว** — เฟส 4 เขียน insert/update/delete ครบทุกตาราง ต่อ write ได้เลยไม่โดน 403 (ยกเว้นเคสที่ต้องอ่านค่าที่ DB สร้างกลับมา ซึ่งต้องผ่าน RPC — `create_owner`, `create_lead`)
+- เรียงตามความคุ้ม: ~~แก้ทรัพย์ (`ListingEditSheet`)~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet` + แท็ก + ข้อร้องเรียน)~~ ✅ → ~~เพิ่มลีด (`LeadIntakeFab`)~~ ✅ → **มอบหมายลีด (`/assign`) — ถัดไป** → เพิ่มทรัพย์ (`ListingIntakeButton`) → ติ๊กงาน `/today` (เขียน `tasks` + `activities`)
 - ทุกจุดต้องเขียน `audit_log` ด้วย (`changed_by` = ตัวเอง ไม่งั้น policy ปฏิเสธ) — pattern อยู่ใน [lib/mutations/listings.ts](haus-crm/lib/mutations/listings.ts) และ [lib/mutations/leads.ts](haus-crm/lib/mutations/leads.ts) แล้ว ก็อบโครงได้เลย
 - ~~`main_6_buyer_crm.tag_id` มีคอลัมน์แล้วแต่แอปยังเก็บแท็กใน `NewLeadsProvider`~~ ✅ เขียนจริงแล้ว (ข้อ 2)
 
@@ -155,7 +155,35 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 
 ---
 
-## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-08)
+## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-10)
+
+### ✅ เสร็จ 2026-08-10: Phase 5 ข้อ 3 — เพิ่มลีดเขียนจริง (`LeadIntakeFab` / `LeadForm`)
+**ใหญ่กว่าข้อ 1-2 มาก** เพราะฟอร์มนี้ถูกออกแบบไว้ตอน design-first โดยใช้ vocabulary ที่**ไม่ตรงกับ DB เลยสักตัว** — ถ้าต่อ insert ตรงๆ จะ FK violation ทุกครั้ง (บั๊กแบบเดียวกับ `COMPLAINT_STATUSES` ข้อ 2 แต่กระจายทั้งฟอร์ม: `ddproperty` vs `Ddproperty` · `line_oa` vs `LINE OA` · `male` vs `Male` · `ไทย` vs `Thai` · `buyer`/`owner` vs `Buyer - Buy`/`Owner - Sale` · ชื่อเล่น `Mhow` vs `S-004`)
+
+**Ben ตัดสินใจ 4 ข้อ**: เขียน `main_5` → `main_6` ทั้งคู่ · โหลด vocabulary จาก DB จริง · เพิ่มคอลัมน์ใน DB · ให้ `leads.view_all` กับ `listing_support`
+
+**DB (apply บน production + มิเรอร์ลงไฟล์ setup แล้วทั้ง 2 ไฟล์):**
+- **lookup ใหม่ 2 ตาราง** `lead_purpose` · `sell_reason` (+ RLS policy ครบ — ตารางใหม่ต้องเขียน policy เองเสมอ เพราะ `rls_auto_enable()` ของ Supabase บังคับเปิด RLS ให้ ถ้าไม่มี policy จะอ่าน dropdown ไม่ได้เลย)
+- **4 คอลัมน์ใหม่บน `main_6_buyer_crm`** — `interest_zone` · `interest_property_type` · `purpose` · `sell_reason` (เลือก main_6 ไม่ใช่ main_5 เพราะแอปอ่าน main_6 ทุกที่ + เป็นข้อมูลที่เซลแก้ได้เรื่อยๆ ส่วนราคาที่เจ้าของต้องการใช้ `budget` ช่องเดิม)
+- **RPC `create_lead(p jsonb)`** (`security definer`) — เขียน main_5 (trigger สร้าง lead_id) + main_6 (`lead_ref` ผูกกลับ) ในทรานแซกชันเดียว **กับดักเดิมของ `main_2_owner` ซ้ำอีกรอบ**: `insert ... returning lead_id` โดน SELECT policy เช็คด้วย → admin ที่มอบลีดให้คนอื่น และ `listing_support` (ไม่มีสิทธิ์ดูลีดเลย) อ่านแถวที่ตัวเองเพิ่งเขียนไม่ได้ ชน 42501
+- **`listing_support` ได้ `leads.view_all`** ตามที่ Ben สั่ง (เดิมมี `leads.create`+`leads.assign` แต่ดูลีดไม่ได้เลย — สร้างเสร็จแล้วมองไม่เห็นของตัวเอง)
+
+**🐛 บั๊กที่เจอจากการทดสอบ (ไม่ได้เกิดจากงานนี้ แต่จะระเบิดทันทีที่เริ่มใช้)**: `main_5_lead_database` **ว่าง 0 แถว** (import 2026-08-03 ลงแต่ main_6) แต่ trigger `set_lead_database_id` นับเลขจาก main_5 ตารางเดียว → ลีดใหม่จะได้ `L26-001` แล้วไล่ขึ้นไป **ชน `L26-007` ที่มีอยู่จริงในลีดที่ 7** (PK collision, insert ล้มทั้งรายการ) — **แก้ trigger ให้นับจากทั้ง 2 ตาราง** (ทั้งคู่ใช้ id ชุดเดียวกันโดยดีไซน์) ทดสอบแล้วได้ `L26-990` → `L26-991` ต่อเนื่องถูกต้อง
+
+**ไฟล์ที่แก้ (ใน `haus-crm/`):**
+- **[lib/lookups.ts](haus-crm/lib/lookups.ts) (ใหม่)** — `getLookups()` ดึง 9 lookup จริงจาก DB + `getAssignableAgents()` ดึงเซล Active จาก `main_1_hr` (คืน employee_code) · `lead_type` เรียงตามลำดับธุรกิจไม่ใช่ตัวอักษร (ไม่งั้นเลือก "เจ้าของ" แล้ว default เป็น `Owner - Others` แทน `Owner - Sale`)
+- **[lib/search.ts](haus-crm/lib/search.ts) (ใหม่)** — `searchListings()` ค้นทรัพย์จริง 511 รายการ (เดิม hardcode ปลอม 6 ตัว) คืน `effective_sale_id` ให้ default ผู้รับมอบหมาย = เซลที่ดูแลทรัพย์นั้น
+- **[lib/mutations/leads.ts](haus-crm/lib/mutations/leads.ts)** — เพิ่ม `createLead()` เช็คสิทธิ์ + บังคับว่าคนที่ไม่มี `leads.assign` จะยัด `sale_id` เป็นคนอื่นไม่ได้ (ลงชื่อตัวเองเสมอ) + `audit_log`
+- **[components/LeadForm.tsx](haus-crm/components/LeadForm.tsx)** — dropdown ทุกตัวมาจาก DB · combobox ทรัพย์ค้นจริง (debounce 250ms) · assignee เก็บ employee_code · submit เขียนจริง + โชว์ `lead_id` ที่ได้กลับมา
+- **[components/MasterDataProvider.tsx](haus-crm/components/MasterDataProvider.tsx)** — รับค่าจาก DB เป็น initial (seed เหลือเป็น fallback ตอนไม่มี session) + เพิ่ม `leadTypes`/`purposes`/`sellReasons`/`zones`
+- **[lib/leads.ts](haus-crm/lib/leads.ts)** — `emptyLead()` ไม่ preset ค่า vocabulary อีกต่อไป (การเดา default คือต้นเหตุที่ seed slug หลุดเข้าฟอร์ม) · เพิ่ม `todayISO()` แทน `INTAKE_TODAY` ที่ hardcode `2026-07-20` · ลบ `nextLeadId()` (DB เป็นเจ้าของ id)
+- **[components/NewLeadsProvider.tsx](haus-crm/components/NewLeadsProvider.tsx)** + **[LeadAssignment.tsx](haus-crm/components/LeadAssignment.tsx)** — ลบ `newLeads`/`addLead` (ลีดใหม่มาจาก DB แล้ว) เหลือ `assignments`/`assign`/`historyOf` ให้ข้อ 4
+
+**ทดสอบแล้ว**: RPC ระดับ DB ทั้งในนาม E-001 และ **SP-001/listing_support** (เคสที่เดิมพัง) → ได้ lead_id ทั้งคู่ · negative case: agent (S-004, ไม่มี `leads.create`) ถูกปฏิเสธ 42501 · เบราว์เซอร์จริง login E-001 → buyer path (`L26-990`, ค้นทรัพย์ HPHU001 → assignee auto = S-004) + owner path (`L26-991`, `sell_reason` เขียนจริง, ฟิลด์ฝั่ง buyer เป็น null ถูกต้อง) · เช็ค main_5/main_6/audit_log ตรงหมด · ลบข้อมูลทดสอบครบ (953/0/452 เท่าเดิม)
+
+**ค้างไว้ (ไม่เร่ง)**: `/assign` กับ `LeadTimeline` ยังใช้ `defaultAssignee()`/`assignableAgents()` จาก sample เดิม (เทียบชื่อเล่นกับทรัพย์ปลอม) — เป็นของ Phase 5 ข้อ 4 ที่จะแก้อยู่แล้ว · `lib/ai/parseLead.ts` ยังอ่านโซนจาก `SAMPLE_INTEREST_LISTINGS`
+
+---
 
 ### ✅ แก้แล้ว 2026-08-08: หน้า `/leads/[id]` พังบางลีด — "Cannot read properties of undefined (reading 'kind')"
 Ben เจอบน production ว่าลีด**บางคน**เปิดแล้ว error บางคนไม่ — **เป็นบั๊กตัวเดียวกันเป๊ะกับที่แก้ไปแล้วเมื่อ 2026-08-05** (`lib/tags.ts` signed shift) แต่คนละไฟล์ที่ตอนนั้นหาไม่เจอ

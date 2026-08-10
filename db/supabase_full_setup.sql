@@ -45,6 +45,8 @@ drop table if exists lead_type cascade;
 drop table if exists complain_status cascade;
 drop table if exists marketing_channel cascade;
 drop table if exists contact_by cascade;
+drop table if exists lead_purpose cascade;
+drop table if exists sell_reason cascade;
 drop table if exists employee_status cascade;
 drop table if exists job_position cascade;
 drop table if exists second_position cascade;
@@ -129,6 +131,14 @@ create table contact_by (name text primary key);
 insert into contact_by (name) values
   ('Call'), ('LINE OA'), ('Facebook Inbox'), ('Tiktok Inbox'),
   ('Ddproperty Inbox'), ('Livinginsider Inbox'), ('Email'), ('Personal');
+
+-- ความต้องการของลีด (เพิ่ม 2026-08-08 ตอนต่อฟอร์มเพิ่มลีด — ฟอร์มถามมาตั้งแต่แรกแต่ไม่มีที่เก็บ)
+create table lead_purpose (name text primary key);
+insert into lead_purpose (name) values ('ซื้ออยู่เอง'), ('ลงทุน / ปล่อยเช่า'), ('เช่า');
+
+create table sell_reason (name text primary key);
+insert into sell_reason (name) values
+  ('ขยับขยาย'), ('ย้ายที่อยู่'), ('ต้องการเงินสด'), ('ขายทำกำไร'), ('อื่นๆ');
 
 -- ---- main_1_hr ----
 create table employee_status (name text primary key);
@@ -465,7 +475,10 @@ insert into role_permissions (role_id, permission_key) values
   ('agent','activity.log'),('agent','performance.view_own'),
   ('agent','targets.stretch'),('agent','leave.request'),
 
+  -- leads.view_all เพิ่ม 2026-08-08: role นี้เป็นคนรับลีดเข้าระบบ + มอบหมายให้เซล แต่เดิม
+  -- ไม่มีสิทธิ์ดูลีดเลยสักตัว → สร้างลีดเสร็จแล้วมองไม่เห็นของที่ตัวเองเพิ่งสร้าง
   ('listing_support','leads.create'),('listing_support','leads.assign'),
+  ('listing_support','leads.view_all'),
   ('listing_support','contacts.view_all'),
   ('listing_support','listings.view'),('listing_support','listings.edit'),
   ('listing_support','listings.marketing'),('listing_support','projects.edit'),
@@ -680,13 +693,21 @@ create table main_5_lead_database (
   created_at timestamptz default now()
 );
 
+-- ⚠️ นับเลขจาก main_5 + main_6 ทั้งคู่ (แก้ 2026-08-08) — ทั้งสองตารางใช้ id ชุดเดียวกัน
+-- (main_6.lead_id มิเรอร์ main_5.lead_id) ถ้าดูแค่ main_5 จะพังทันทีเมื่อ main_5 ว่างแต่
+-- main_6 มีข้อมูล ซึ่งเป็นสถานะจริงหลัง import 2026-08-03 (main_5 = 0 แถว, main_6 = 953)
+-- → เลขจะเริ่มใหม่ที่ L26-001 แล้วไปชน lead_id ที่มีอยู่จริงในลีดที่ 7
 create or replace function set_lead_database_id()
 returns trigger language plpgsql as $$
 declare yy text := to_char(now(),'YY'); next_num int;
 begin
   if new.lead_id is null or new.lead_id = '' then
     select coalesce(max((split_part(lead_id,'-',2))::int),0)+1 into next_num
-      from main_5_lead_database where lead_id like 'L' || yy || '-%';
+    from (
+      select lead_id from main_5_lead_database where lead_id like 'L' || yy || '-%'
+      union all
+      select lead_id from main_6_buyer_crm     where lead_id like 'L' || yy || '-%'
+    ) all_leads;
     new.lead_id := 'L' || yy || '-' || lpad(next_num::text,3,'0');
   end if;
   return new;
@@ -732,6 +753,14 @@ create table main_6_buyer_crm (
   complain_remark         text,
   -- หมายเหตุ: ไม่มี recheck_status — "เซลติดต่อลูกค้าแล้วยัง" derive จาก pipeline_stage
   -- (สเตจไหนก็ตามที่เลย 'Lead' = ติดต่อแล้ว) เก็บเป็นคอลัมน์จะกลายเป็นข้อมูล 2 ชุดที่ขัดกันเอง
+
+  -- ==== ความต้องการของลูกค้า (เพิ่ม 2026-08-08 ตอนต่อฟอร์มเพิ่มลีด) ====
+  -- อยู่ main_6 ไม่ใช่ main_5 เพราะเป็นข้อมูลที่เซลแก้ได้เรื่อยๆ (main_5 freeze ตอนรับลีด)
+  -- ราคาที่เจ้าของต้องการใช้ budget ช่องเดิม (ฟอร์มใช้เป็นทั้งงบผู้ซื้อ/ราคาเจ้าของอยู่แล้ว)
+  interest_zone           text references zone (zone_id)             on update cascade,
+  interest_property_type  text references property_type (name)       on update cascade,
+  purpose                 text references lead_purpose (name)        on update cascade,  -- ผู้ซื้อ
+  sell_reason             text references sell_reason (name)         on update cascade,  -- เจ้าของ
 
   created_at timestamptz default now()
 );
