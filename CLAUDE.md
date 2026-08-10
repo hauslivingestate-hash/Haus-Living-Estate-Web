@@ -19,12 +19,12 @@
 | ข้อมูล | ✅ import จากชีทครบ — ทรัพย์ **511** · ลีด **953** · โครงการ **308** · เจ้าของ **452** · กิจกรรม **2,334** · Last Match **56** · พนักงาน **10** · โซน **30** |
 | Login | ✅ ใช้งานจริง — **9 บัญชี** (พนักงาน 8 + Admin) · บังคับ login แล้ว · มีหน้าเปลี่ยนรหัส `/account` · **CEO/HR สร้าง/รีเซ็ตรหัสให้คนอื่นได้แล้วที่ ตั้งค่า → บัญชีผู้ใช้** |
 | สิทธิ์ | ✅ RBAC อยู่ใน DB — **36 สิทธิ์** · 8 บทบาท · ผูกกับพนักงานจริงแล้ว |
-| DB | ✅ **56 ตาราง** (+`lead_purpose`/`sell_reason` 2026-08-10) · เงินเดือน/PII ล็อกแล้ว · +2 function (`create_owner` ดู Phase 5 ข้อ 1 · `create_lead` ดู Phase 5 ข้อ 3) |
+| DB | ✅ **56 ตาราง** (+`lead_purpose`/`sell_reason` 2026-08-10) · เงินเดือน/PII ล็อกแล้ว · +3 function (`create_owner` Phase 5 ข้อ 1 · `create_lead` ข้อ 3 · `resolve_employee_code` ข้อ 4) |
 | ความปลอดภัย | ✅ **RLS Phase 4 ปิดครบแล้ว** — `demo_read_all` + anon ถูกถอนหมด (ดูรายละเอียดใต้ Phase 4) |
-| ⚠️ การบันทึก | 🟡 **เริ่มแล้ว 3/6 — แก้ทรัพย์ + แก้ลีด/แท็ก/ข้อร้องเรียน + เพิ่มลีดเขียนจริงแล้ว** ที่เหลือ (มอบหมาย/เพิ่มทรัพย์/ติ๊กงาน) ยัง stub (ดู Phase 5) |
+| ⚠️ การบันทึก | 🟡 **เริ่มแล้ว 4/6 — แก้ทรัพย์ + แก้ลีด + เพิ่มลีด + มอบหมายลีดเขียนจริงแล้ว** ที่เหลือ (เพิ่มทรัพย์/ติ๊กงาน) ยัง stub (ดู Phase 5) |
 
 ### งานถัดไปตามลำดับ (ดูรายละเอียดเต็มที่ 🗺️ แผนเฟส ด้านล่าง)
-1. **Phase 5 (Write path)** — ต่อปุ่ม save ทุกหน้า: ~~แก้ทรัพย์~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ~~ ✅ → ~~เพิ่มลีด~~ ✅ → **มอบหมายลีด `/assign` (ถัดไป)** → เพิ่มทรัพย์ → ติ๊กงาน `/today`
+1. **Phase 5 (Write path)** — ต่อปุ่ม save ทุกหน้า: ~~แก้ทรัพย์~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ~~ ✅ → ~~เพิ่มลีด~~ ✅ → ~~มอบหมายลีด~~ ✅ → **เพิ่มทรัพย์ `ListingIntakeButton` (ถัดไป)** → ติ๊กงาน `/today`
 2. **Phase 6** — เชื่อมหน้าที่ยังอ่านจาก seed ในโค้ด (~9 หน้า: `/` `/today` `/contacts` `/projects` `/last-match` `/team` `/leave` `/new-sales` `/website`) ให้ query DB จริง
 3. หน้าตั้งค่าโซนในเว็บยังเป็น 1 โซน 1 เซล ต้องแก้ให้รองรับหลายคน (DB รองรับแล้วผ่าน `zone_sales`)
 4. ~~หน้าจัดการบัญชีสำหรับ Admin~~ ✅ เสร็จ 2026-08-08 — ดู Phase 7
@@ -130,10 +130,10 @@ price_remark, unit_condition, close_type
 | **7** | **งานแอดมิน/ops ที่ยังไม่มีที่ทำ** | 🟡 บางส่วน |
 | **8** | **ฟีเจอร์แยก (มีเอกสารของตัวเอง)** | ⬜ ยังไม่เริ่ม |
 
-### เฟส 5 — Write path (ต่อปุ่ม save) 🟡 เริ่มแล้ว 3/6
-**ทุกปุ่มบันทึกเคยเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย — **ข้อ 1 เสร็จ 2026-08-07 · ข้อ 2 เสร็จ 2026-08-08 · ข้อ 3 เสร็จ 2026-08-10** (รายละเอียดที่ 🔖 ค้างอยู่ตรงนี้ ด้านบน)
+### เฟส 5 — Write path (ต่อปุ่ม save) 🟡 เริ่มแล้ว 4/6
+**ทุกปุ่มบันทึกเคยเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย — **ข้อ 1 เสร็จ 2026-08-07 · ข้อ 2 เสร็จ 2026-08-08 · ข้อ 3-4 เสร็จ 2026-08-10** (รายละเอียดที่ 🔖 ค้างอยู่ตรงนี้ ด้านบน) · **store in-memory ยุค design-first ตายหมดแล้ว** (`NewLeadsProvider` ลบทิ้งทั้งไฟล์)
 - ✅ **ข่าวดี: policy ฝั่ง DB พร้อมแล้ว** — เฟส 4 เขียน insert/update/delete ครบทุกตาราง ต่อ write ได้เลยไม่โดน 403 (ยกเว้นเคสที่ต้องอ่านค่าที่ DB สร้างกลับมา ซึ่งต้องผ่าน RPC — `create_owner`, `create_lead`)
-- เรียงตามความคุ้ม: ~~แก้ทรัพย์ (`ListingEditSheet`)~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet` + แท็ก + ข้อร้องเรียน)~~ ✅ → ~~เพิ่มลีด (`LeadIntakeFab`)~~ ✅ → **มอบหมายลีด (`/assign`) — ถัดไป** → เพิ่มทรัพย์ (`ListingIntakeButton`) → ติ๊กงาน `/today` (เขียน `tasks` + `activities`)
+- เรียงตามความคุ้ม: ~~แก้ทรัพย์ (`ListingEditSheet`)~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet` + แท็ก + ข้อร้องเรียน)~~ ✅ → ~~เพิ่มลีด (`LeadIntakeFab`)~~ ✅ → ~~มอบหมายลีด (`/assign` + แมปชื่อ→รหัสอัตโนมัติ)~~ ✅ → **เพิ่มทรัพย์ (`ListingIntakeButton`) — ถัดไป** → ติ๊กงาน `/today` (เขียน `tasks` + `activities`)
 - ทุกจุดต้องเขียน `audit_log` ด้วย (`changed_by` = ตัวเอง ไม่งั้น policy ปฏิเสธ) — pattern อยู่ใน [lib/mutations/listings.ts](haus-crm/lib/mutations/listings.ts) และ [lib/mutations/leads.ts](haus-crm/lib/mutations/leads.ts) แล้ว ก็อบโครงได้เลย
 - ~~`main_6_buyer_crm.tag_id` มีคอลัมน์แล้วแต่แอปยังเก็บแท็กใน `NewLeadsProvider`~~ ✅ เขียนจริงแล้ว (ข้อ 2)
 
@@ -145,7 +145,7 @@ price_remark, unit_condition, close_type
 - `lib/zones.ts` + `ZonesAdmin` ยังเป็น 1 โซน 1 เซล ต้องแก้ให้ตรง `zone_sales` (many-to-many + `is_primary`)
 
 ### เฟส 7 — แอดมิน/ops 🟡
-- [x] **หน้าจัดการบัญชี** (สร้าง/รีเซ็ตรหัสให้คนอื่น) — เสร็จ 2026-08-08 ที่ `/settings` → "บัญชีผู้ใช้" ([AccountsManager](haus-crm/components/AccountsManager.tsx) + [lib/mutations/accounts.ts](haus-crm/lib/mutations/accounts.ts) + [lib/supabase/admin.ts](haus-crm/lib/supabase/admin.ts)) gate ด้วย permission ใหม่ `people.manage_accounts` (**CEO / HR / system_admin เท่านั้น** — Ben ตัดสินใจเจาะจงว่าไม่ใช่ `admin` business role และไม่ใช่ `people.manage` เดิมที่กว้างกว่า) — ทดสอบจริงผ่าน `browser-automation` แล้ว: สร้างบัญชีให้ Pai + รีเซ็ตรหัส Mhow ผ่านหน้านี้ ยืนยัน login ได้จริง แล้วลบ/คืนค่าทดสอบทั้งหมด (ลบ auth user ของ Pai ผ่าน Admin REST ตรง คืนอีเมลเดิมจากไฟล์ import, รีเซ็ตรหัส Mhow กลับเป็นของเดิม) — **ต้องตั้ง `SUPABASE_SERVICE_ROLE_KEY` ใน Vercel ด้วยก่อน production จะใช้ได้จริง** (ตอนนี้ตั้งไว้แค่ `.env.local` ในเครื่อง)
+- [x] **หน้าจัดการบัญชี** (สร้าง/รีเซ็ตรหัสให้คนอื่น) — เสร็จ 2026-08-08 ที่ `/settings` → "บัญชีผู้ใช้" ([AccountsManager](haus-crm/components/AccountsManager.tsx) + [lib/mutations/accounts.ts](haus-crm/lib/mutations/accounts.ts) + [lib/supabase/admin.ts](haus-crm/lib/supabase/admin.ts)) gate ด้วย permission ใหม่ `people.manage_accounts` (**CEO / HR / system_admin เท่านั้น** — Ben ตัดสินใจเจาะจงว่าไม่ใช่ `admin` business role และไม่ใช่ `people.manage` เดิมที่กว้างกว่า) — ทดสอบจริงผ่าน `browser-automation` แล้ว: สร้างบัญชีให้ Pai + รีเซ็ตรหัส Mhow ผ่านหน้านี้ ยืนยัน login ได้จริง แล้วลบ/คืนค่าทดสอบทั้งหมด (ลบ auth user ของ Pai ผ่าน Admin REST ตรง คืนอีเมลเดิมจากไฟล์ import, รีเซ็ตรหัส Mhow กลับเป็นของเดิม) — ✅ **ตั้ง `SUPABASE_SERVICE_ROLE_KEY` ใน Vercel + redeploy แล้ว 2026-08-10 · ใช้งานได้จริงบน production แล้ว** (ดูวิธียืนยันใต้หัวข้อวันที่ 2026-08-10)
 - **`teams` ยังว่าง + ไม่มีใครเป็น `sales_leader`** — รอ CEO กำหนดหัวหน้าทีม (กระทบ `visible_employee_codes()` → ตอนนี้ "ทีม" = ตัวเองคนเดียว)
 - **`date_started` ว่างทุกคน** (ชีทไม่มี) — กระทบ ladder เซลใหม่ + โควตาลาปีแรก ต้องกรอกในเว็บ
 - ทิศ/ตำแหน่ง/อายุ/ส่วนกลาง ที่ import ปล่อยว่างไว้ (ชีทกรอกเลื่อนช่อง) รอกรอกใหม่ในเว็บ
@@ -156,6 +156,31 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 ---
 
 ## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-10)
+
+### ✅ เสร็จ 2026-08-10: Phase 5 ข้อ 4 — มอบหมายลีดอัตโนมัติ (แมปชื่อ→รหัส) + `/assign` เขียนจริง
+**Ben เปลี่ยนทิศทางระหว่างวางแผน**: ไม่ต้องมีคนนั่งกดมอบหมายทีละราย เพราะลีดที่เข้ามา**ระบุชื่อเซลมาอยู่แล้ว** (ช่อง "Sales Assigned" ในฟอร์มรับลีด) ระบบควรแมปชื่อ → `employee_code` ให้เอง — **ข้อมูลจริงยืนยันว่าถูก: ลีด 952/953 มี `sale_id` ครบแล้ว** เหลือไม่มีคนดูแลแค่ 1 ราย
+
+**DB (apply บน production + มิเรอร์ลง `db/rls_policies.sql` แล้ว):**
+- **`resolve_employee_code(name)`** — เทียบ **ตรงตัว** case-insensitive: `nickname` → `first_name_en` → `first_name_th` · เฉพาะ Active · เจอไม่ชัดหรือหลายคน → คืน `null` ไม่เดา
+  ⚠️ **ห้ามใช้ substring/prefix matching เด็ดขาด** — "Q" เป็นชื่อเล่นจริงของ S-003 ถ้าใช้ `like '%q%'` จะแมปมั่วครึ่งบริษัท
+- **`create_lead` รับ `sale_name` เพิ่ม** — ไม่มี `sale_id` ก็แปลจากชื่อให้ (n8n/ฟอร์มใช้ได้ทันที) · **ชื่อที่แมปไม่ได้ไม่ทำให้ insert ล้ม** ลีดยังถูกสร้างแต่ `sale_id` เป็น null แล้วไปโผล่ในตัวกรอง "ยังไม่มอบหมาย" (ทำลีดลูกค้าหายเพราะพิมพ์ชื่อผิด = แย่กว่ามาก)
+
+**แก้ 3 บั๊กบนหน้า `/assign` ที่มีมาก่อนงานนี้** — ทั้งหมดเป็นอาการเดียวกัน: **โค้ดเทียบชื่อเล่นกับ employee_code**
+1. dropdown ผู้ดูแลเทียบไม่เคยตรง เลยตกไป fallback **โชว์รหัสดิบ `S-004`** แทนชื่อคน (ตัวกรอง + CSV export ก็โดนด้วย)
+2. ป้าย "เจ้าของทรัพย์" ใช้ `defaultAssignee()` จาก sample 6 ตัวปลอม → **ไม่เคยขึ้นเลย** (ถอดออก เพราะ `/assign` ไม่มีข้อมูลผู้ดูแลทรัพย์จริงให้เทียบ)
+3. คอลัมน์ "ช่องทาง" ฮาร์ดโค้ด `null` พร้อมคอมเมนต์ว่า "main_6 ไม่มีคอลัมน์ source" — **ผิด** มี `marketing_channel` อยู่จริง แค่ `CrmRow` ไม่ได้ select
+- เจอเพิ่มตอนทดสอบ: หน้าลีดโชว์รหัสดิบอีก 2 จุด (แถว "ผู้ดูแล" + บรรทัดผู้ทำในไทม์ไลน์) แก้ให้เป็นชื่อแล้ว
+
+**ไฟล์ที่แก้ (ใน `haus-crm/`):**
+- **[lib/mutations/leads.ts](haus-crm/lib/mutations/leads.ts)** — เพิ่ม `assignLead()` เช็ค `leads.assign` → update `sale_id` → `audit_log` (`action='assign'`) · **ไม่ต้องทำ RPC** ต่างจากข้อ 1/3 เพราะเป็น UPDATE ธรรมดา ไม่ต้องอ่านค่าที่ DB สร้างกลับมา (RLS เดิมรองรับอยู่แล้ว)
+- **[lib/leadHistory.ts](haus-crm/lib/leadHistory.ts) (ใหม่)** — `getAssignHistory()` อ่านประวัติจริงจาก `audit_log` ⚠️ `audit_log` อ่านได้เฉพาะ `roles.manage` → คืน `readable:false` แยกจาก "ไม่เคยมีประวัติ" (ไม่งั้นคนทั่วไปจะเห็นช่องว่างที่**โกหกว่าลีดไม่เคยถูกย้ายมือ**)
+- **[components/LeadAssignment.tsx](haus-crm/components/LeadAssignment.tsx)** + **[LeadTimeline.tsx](haus-crm/components/LeadTimeline.tsx)** — dropdown เขียนจริง + optimistic override + agents จาก DB (เก็บ employee_code โชว์ชื่อเล่น)
+- **[lib/queries.ts](haus-crm/lib/queries.ts)** — เพิ่ม `marketing_channel` เข้า `CrmRow`
+- **ลบ [components/NewLeadsProvider.tsx](haus-crm/components/NewLeadsProvider.tsx) ทิ้งทั้งไฟล์** — ไม่มีใครใช้แล้ว ปิดฉาก store in-memory ยุค design-first
+
+**ทดสอบแล้ว**: `resolve_employee_code` ครบทุกเคส (`Mhow`/`mhow`/`MHOW`/เว้นวรรค → S-004 · `Q` → S-003 · ชื่อไทย/อังกฤษ → C-001 · คนลาออก/ชื่อมั่ว/ว่าง/null → null) · `create_lead` ด้วยชื่อ → sale_id ถูก, ชื่อมั่ว → ลีดถูกสร้างแต่ไม่มอบหมาย · เบราว์เซอร์จริง login E-001 → `/assign` dropdown โชว์ชื่อไม่ใช่รหัสแล้ว → ย้าย `L26-018` จาก Mhow → Game → เช็ค DB + `audit_log` ตรง → หน้าลีดโชว์ประวัติจาก `audit_log` และ**ไม่หายหลังรีเฟรช** → คืนค่าครบ (953/952/0)
+
+---
 
 ### ✅ เสร็จ 2026-08-10: Phase 5 ข้อ 3 — เพิ่มลีดเขียนจริง (`LeadIntakeFab` / `LeadForm`)
 **ใหญ่กว่าข้อ 1-2 มาก** เพราะฟอร์มนี้ถูกออกแบบไว้ตอน design-first โดยใช้ vocabulary ที่**ไม่ตรงกับ DB เลยสักตัว** — ถ้าต่อ insert ตรงๆ จะ FK violation ทุกครั้ง (บั๊กแบบเดียวกับ `COMPLAINT_STATUSES` ข้อ 2 แต่กระจายทั้งฟอร์ม: `ddproperty` vs `Ddproperty` · `line_oa` vs `LINE OA` · `male` vs `Male` · `ไทย` vs `Thai` · `buyer`/`owner` vs `Buyer - Buy`/`Owner - Sale` · ชื่อเล่น `Mhow` vs `S-004`)
@@ -234,7 +259,10 @@ Ben สั่งเพิ่มระหว่างคุยกันว่า�
 **วิธีทดสอบที่ใช้**: login เป็น E-001 จริงผ่าน `browser-automation` → สร้างบัญชีให้ Pai (SP-003, ลาออก, ไม่เคยมีบัญชี) ด้วยอีเมลทดสอบ → เช็ค `main_1_hr.auth_user_id` ผูกจริง + `audit_log` มีแถว `action='create_account'` ถูกต้อง → รีเซ็ตรหัสผ่าน Mhow เป็นรหัสชั่วคราว → **login จริงด้วยรหัสใหม่ยืนยันว่าใช้ได้** → รีเซ็ตกลับเป็นรหัสเดิมผ่านฟีเจอร์เดียวกัน → ลบบัญชีทดสอบของ Pai ด้วย Admin REST API ตรง (`DELETE /auth/v1/admin/users/{id}` ผ่านสคริปต์ one-off ที่ลบทิ้งหลังรันเสร็จ — `@supabase/supabase-js` เรียกไม่ได้จาก plain `node` บน Node 20 เพราะ realtime client ต้องการ native `WebSocket` ซึ่งมีแค่ Node 22+ ใช้ REST ตรงเลี่ยงปัญหานี้ได้) → คืนอีเมลเดิมของ Pai (`Elvin.satayu@gmail.com`, เจอจากไฟล์ `import/HR Sheet - Employee Lists.csv` เพราะตอนแรกลืมจดค่าก่อนทับ)
 
 **ยังไม่ทำ (บันทึกไว้กันลืม)**:
-- **`SUPABASE_SERVICE_ROLE_KEY` ตั้งไว้แค่ `.env.local` ในเครื่อง** — ต้องไปตั้งใน Vercel ด้วย (Settings → Environment Variables) ไม่งั้น production เรียกฟีเจอร์นี้ไม่ได้เลย (throw error ชัดเจนแทนที่จะพังเงียบๆ ตามที่ออกแบบไว้ แต่ก็ยังใช้งานไม่ได้อยู่ดีจนกว่าจะตั้งค่า)
+- ~~**`SUPABASE_SERVICE_ROLE_KEY` ตั้งไว้แค่ `.env.local` ในเครื่อง**~~ ✅ **เสร็จ 2026-08-10** — ตั้งใน Vercel (Production) + redeploy แล้ว ยืนยันด้วยการเรียกใช้จริงบน production
+  - ⚠️ **บทเรียน: ตั้ง env var บน Vercel เฉยๆ ไม่พอ ต้อง redeploy ด้วย** — deployment ที่ build ไปแล้วมองไม่เห็นตัวแปรใหม่ รอบแรกที่เช็คยังได้ HTTP 500 อยู่ทั้งที่ตั้งค่าแล้ว
+  - **วิธียืนยันที่ใช้ (ปลอดภัย ไม่กระทบใคร ใช้ซ้ำได้)**: login production เป็น E-001 → ตั้งค่า → บัญชีผู้ใช้ → "ตั้งรหัสผ่านใหม่" ให้ **E-001 เอง โดยกรอกรหัสเดิมเป๊ะ** → เป็นการเรียก `auth.admin.updateUserById` จริงแต่ผลลัพธ์ไม่เปลี่ยนอะไร → เช็ค `auth.users.updated_at` ขยับ + `audit_log` มีแถว `reset_password` ใหม่
+  - **วิธีแยกสาเหตุตอนพัง**: รันโค้ดชุดเดียวกันบน `npm run dev` (ซึ่งมี key ใน `.env.local`) เทียบกับ production — สำเร็จที่ local แต่ 500 บน production = ตัวแปรไม่ถึง runtime ไม่ใช่บั๊กโค้ด · **key ผิด ≠ key หาย**: key ผิดจะได้ `Invalid API key` กลับมาใน UI สวยๆ ส่วน key หายจะ throw ที่ [lib/supabase/admin.ts:18](haus-crm/lib/supabase/admin.ts#L18) ก่อนยิง API เลย → server action ตอบ HTTP 500 ดิบๆ
 - ยังไม่ได้ทดสอบ negative case (เรียก `resetUserPassword`/`createUserAccount` ตรงๆ ตอน login เป็นคนไม่มีสิทธิ์) แบบ live — เชื่อตาม pattern เดียวกับ `updateListing` ที่ทดสอบแล้วใน Phase 5 ข้อ 1 (permission check ก่อนแตะ DB เสมอ) แต่ยังไม่ได้ exploit-test ฟีเจอร์นี้ตรงๆ
 - ไม่มีปุ่มลบบัญชี (auth) ในหน้านี้ — ถ้าต้องการ offboard คนออกจริงต้องทำ SQL ตรงหรือเพิ่มฟีเจอร์แยก
 

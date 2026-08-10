@@ -507,7 +507,9 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare v_lead_id text;
+declare
+  v_lead_id text;
+  v_sale_id text;
 begin
   if not (has_perm('leads.create') or has_perm('roles.manage')) then
     raise exception 'insufficient permission' using errcode = '42501';
@@ -515,6 +517,14 @@ begin
 
   if coalesce(btrim(p->>'lead_name'), '') = '' then
     raise exception 'lead_name is required' using errcode = '23514';
+  end if;
+
+  -- รหัสที่ส่งมาตรงๆ ชนะเสมอ ไม่งั้นแปลจากชื่อ (ฟอร์ม/n8n ส่ง "Sales Assigned" มาเป็นชื่อ)
+  -- ชื่อที่แมปไม่ได้ "ไม่" ทำให้ insert ล้ม — ลีดยังถูกสร้างแต่ sale_id เป็น null แล้วไปโผล่
+  -- ในตัวกรอง "ยังไม่มอบหมาย" ให้คนมาแก้ ดีกว่าทำลีดลูกค้าหายเพราะพิมพ์ชื่อผิด
+  v_sale_id := nullif(p->>'sale_id', '');
+  if v_sale_id is null then
+    v_sale_id := resolve_employee_code(p->>'sale_name');
   end if;
 
   insert into main_5_lead_database (
@@ -531,7 +541,7 @@ begin
     nullif(p->>'gender', ''),
     nullif(p->>'nationality', ''),
     nullif(p->>'remark', ''),
-    nullif(p->>'sale_id', ''),
+    v_sale_id,
     nullif(p->>'contact_date', '')::date,
     nullif(p->>'contact_time', '')::time,
     nullif(p->>'marketing_channel', ''),
@@ -552,7 +562,7 @@ begin
     coalesce((p->>'date_received')::date, current_date),
     nullif(p->>'listing_code', ''),
     nullif(p->>'lead_type', ''),
-    nullif(p->>'sale_id', ''),
+    v_sale_id,
     btrim(p->>'lead_name'),
     nullif(btrim(coalesce(p->>'phone', '')), ''),
     nullif(p->>'line_id', ''),
