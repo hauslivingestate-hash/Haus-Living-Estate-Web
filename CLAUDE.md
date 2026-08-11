@@ -21,10 +21,10 @@
 | สิทธิ์ | ✅ RBAC อยู่ใน DB — **36 สิทธิ์** · 8 บทบาท · ผูกกับพนักงานจริงแล้ว |
 | DB | ✅ **56 ตาราง** (+`lead_purpose`/`sell_reason` 2026-08-10) · เงินเดือน/PII ล็อกแล้ว · +3 function (`create_owner` Phase 5 ข้อ 1 · `create_lead` ข้อ 3 · `resolve_employee_code` ข้อ 4) |
 | ความปลอดภัย | ✅ **RLS Phase 4 ปิดครบแล้ว** — `demo_read_all` + anon ถูกถอนหมด (ดูรายละเอียดใต้ Phase 4) |
-| ⚠️ การบันทึก | 🟡 **เริ่มแล้ว 4/6 — แก้ทรัพย์ + แก้ลีด + เพิ่มลีด + มอบหมายลีดเขียนจริงแล้ว** ที่เหลือ (เพิ่มทรัพย์/ติ๊กงาน) ยัง stub (ดู Phase 5) |
+| ⚠️ การบันทึก | 🟡 **เริ่มแล้ว 5/6 — เหลือแค่ติ๊กงาน `/today` จุดเดียว** (ดู Phase 5) |
 
 ### งานถัดไปตามลำดับ (ดูรายละเอียดเต็มที่ 🗺️ แผนเฟส ด้านล่าง)
-1. **Phase 5 (Write path)** — ต่อปุ่ม save ทุกหน้า: ~~แก้ทรัพย์~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ~~ ✅ → ~~เพิ่มลีด~~ ✅ → ~~มอบหมายลีด~~ ✅ → **เพิ่มทรัพย์ `ListingIntakeButton` (ถัดไป)** → ติ๊กงาน `/today`
+1. **Phase 5 (Write path)** — ต่อปุ่ม save ทุกหน้า: ~~แก้ทรัพย์~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ~~ ✅ → ~~เพิ่มลีด~~ ✅ → ~~มอบหมายลีด~~ ✅ → ~~เพิ่มทรัพย์~~ ✅ → **ติ๊กงาน `/today` (จุดสุดท้าย)**
 2. **Phase 6** — เชื่อมหน้าที่ยังอ่านจาก seed ในโค้ด (~9 หน้า: `/` `/today` `/contacts` `/projects` `/last-match` `/team` `/leave` `/new-sales` `/website`) ให้ query DB จริง
 3. หน้าตั้งค่าโซนในเว็บยังเป็น 1 โซน 1 เซล ต้องแก้ให้รองรับหลายคน (DB รองรับแล้วผ่าน `zone_sales`)
 4. ~~หน้าจัดการบัญชีสำหรับ Admin~~ ✅ เสร็จ 2026-08-08 — ดู Phase 7
@@ -131,10 +131,10 @@ price_remark, unit_condition, close_type
 | **7** | **งานแอดมิน/ops ที่ยังไม่มีที่ทำ** | 🟡 บางส่วน |
 | **8** | **ฟีเจอร์แยก (มีเอกสารของตัวเอง)** | ⬜ ยังไม่เริ่ม |
 
-### เฟส 5 — Write path (ต่อปุ่ม save) 🟡 เริ่มแล้ว 4/6
-**ทุกปุ่มบันทึกเคยเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย — **ข้อ 1 เสร็จ 2026-08-07 · ข้อ 2 เสร็จ 2026-08-08 · ข้อ 3-4 เสร็จ 2026-08-10** (รายละเอียดที่ 🔖 ค้างอยู่ตรงนี้ ด้านบน) · **store in-memory ยุค design-first ตายหมดแล้ว** (`NewLeadsProvider` ลบทิ้งทั้งไฟล์)
+### เฟส 5 — Write path (ต่อปุ่ม save) 🟡 เริ่มแล้ว 5/6
+**ทุกปุ่มบันทึกเคยเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย — **ข้อ 1 เสร็จ 2026-08-07 · ข้อ 2 เสร็จ 2026-08-08 · ข้อ 3-5 เสร็จ 2026-08-10/11** (รายละเอียดที่ 🔖 ค้างอยู่ตรงนี้ ด้านบน) · **store in-memory ยุค design-first ตายหมดแล้ว** (`NewLeadsProvider` ลบทิ้งทั้งไฟล์)
 - ✅ **ข่าวดี: policy ฝั่ง DB พร้อมแล้ว** — เฟส 4 เขียน insert/update/delete ครบทุกตาราง ต่อ write ได้เลยไม่โดน 403 (ยกเว้นเคสที่ต้องอ่านค่าที่ DB สร้างกลับมา ซึ่งต้องผ่าน RPC — `create_owner`, `create_lead`)
-- เรียงตามความคุ้ม: ~~แก้ทรัพย์ (`ListingEditSheet`)~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet` + แท็ก + ข้อร้องเรียน)~~ ✅ → ~~เพิ่มลีด (`LeadIntakeFab`)~~ ✅ → ~~มอบหมายลีด (`/assign` + แมปชื่อ→รหัสอัตโนมัติ)~~ ✅ → **เพิ่มทรัพย์ (`ListingIntakeButton`) — ถัดไป** → ติ๊กงาน `/today` (เขียน `tasks` + `activities`)
+- เรียงตามความคุ้ม: ~~แก้ทรัพย์ (`ListingEditSheet`)~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet` + แท็ก + ข้อร้องเรียน)~~ ✅ → ~~เพิ่มลีด (`LeadIntakeFab`)~~ ✅ → ~~มอบหมายลีด (`/assign` + แมปชื่อ→รหัสอัตโนมัติ)~~ ✅ → ~~เพิ่มทรัพย์ (`ListingIntakeButton`)~~ ✅ → **ติ๊กงาน `/today` (เขียน `tasks` + `activities`) — จุดสุดท้าย**
 - ทุกจุดต้องเขียน `audit_log` ด้วย (`changed_by` = ตัวเอง ไม่งั้น policy ปฏิเสธ) — pattern อยู่ใน [lib/mutations/listings.ts](haus-crm/lib/mutations/listings.ts) และ [lib/mutations/leads.ts](haus-crm/lib/mutations/leads.ts) แล้ว ก็อบโครงได้เลย
 - ~~`main_6_buyer_crm.tag_id` มีคอลัมน์แล้วแต่แอปยังเก็บแท็กใน `NewLeadsProvider`~~ ✅ เขียนจริงแล้ว (ข้อ 2)
 
@@ -156,7 +156,26 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 
 ---
 
-## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-10)
+## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-11)
+
+### ✅ เสร็จ 2026-08-11: Phase 5 ข้อ 5 — เพิ่มทรัพย์เขียนจริง (`ListingIntakeButton` / `ListingForm`)
+ฟอร์มนี้ถูกออกแบบก่อน schema นิ่ง เลยมี **3 จุดที่เขียนตรงๆ ไม่ได้เลย** (เจอจาก query DB จริง):
+
+1. 🔑 **`main_4_listing_database` ไม่มีคอลัมน์ `listing_name`** — ชื่อทรัพย์ที่โชว์ทุกหน้ามาจาก view: **`v_main_listing.listing_name = main_3_property_detail.project_name_thai`** ผูกผ่าน `project_id` แต่ฟอร์มมีช่อง "ชื่อทรัพย์" เป็น free text + บังคับกรอก ซึ่งไม่มีที่เก็บ → **ทรัพย์ที่สร้างจะไม่มีชื่อทุกหน้า** · **Ben เลือก: ช่องโครงการเป็นตัวค้นหาจริง + สร้างโครงการใหม่ได้ในฟอร์ม** แล้วตัดช่อง "ชื่อทรัพย์" ทิ้ง (ไม่แก้ schema)
+2. **trigger `set_listing_id` โยน exception ถ้าไม่มี `zone`** (`raise exception 'ต้องระบุ property_type และ zone ก่อน'`) แต่ฟอร์มให้เลือก "— ไม่ระบุ —" ได้ → **บันทึกล้มทุกครั้ง** · แก้: บังคับเลือกทั้ง 2 ช่อง + เช็คที่ชั้นแอปก่อน ให้ขึ้นข้อความไทยแทน exception ดิบ
+3. `listZones()`/`assignableAgents()` เป็น sample (ชื่อเล่น) ทั้งที่ `sale_id` เป็น FK → `employee_code` — บั๊กเดียวกับ `/assign` ข้อ 4
+
+**🐛 บั๊กแฝงที่เจอระหว่างทาง (จากงาน Phase 5 ข้อ 1 เอง)**: `LISTING_FIELDS` ใน `updateListing` มี `listing_name` อยู่ด้วย ทั้งที่ **ไม่ใช่คอลัมน์ของ main_4** → ใครแก้ช่อง "ชื่อทรัพย์" ใน `ListingEditSheet` จะได้ error จาก Postgres ทันที (ตอนทดสอบ 08-07 แก้แค่ remark/status เลยไม่โดน) — **แก้แล้ว**: ถอดออกจาก map + ทำช่องนั้นเป็น read-only พร้อมบอกว่าชื่อมาจากโครงการ
+
+**ไม่ต้องทำ RPC รอบนี้** (ต่างจากข้อ 1/3) — ทุก role ที่มี `listings.create` มี `listings.view` ครบ และ SELECT policy ของ `main_4`/`main_3` เป็นการเช็คสิทธิ์ล้วน **ไม่ scope ตามแถว** → `.insert().select('listing_id')` ผ่านปกติ (ต่างจาก `main_2_owner` ที่ SELECT ผูกกับ "ต้องมี listing โยงอยู่แล้ว" จึงยังต้องใช้ `create_owner` RPC เดิม)
+
+**ไฟล์ที่แก้ (ใน `haus-crm/`):** `lib/mutations/listings.ts` (+`createListing`, +`createProject`) · `lib/search.ts` (+`searchProjects`) · `lib/lookups.ts` + `MasterDataProvider` (+`listingPotentials` — ของเดิม `POTENTIALS` มี 3 ค่า แต่ตาราง `listing_potential` จริงมี **5** ขาด `A List + Fb add`/`Exclusive A`) · `lib/newListing.ts` (ตัด `listing_name`, ใส่ `project_id`) · `ListingForm.tsx` (เขียนใหม่ทั้งไฟล์) · `ListingIntakeButton.tsx` + `listings/page.tsx` (ส่ง agents)
+
+**ทดสอบแล้ว (login เป็น Mhow / S-004 / agent — จงใจใช้คนที่มี `listings.create` แต่ **ไม่มี** `projects.edit`)**: เลือกโครงการที่มีอยู่ → ได้ `CASK020` (C=คอนโด + ASK=อโศก prefix ถูก) **และหน้าทรัพย์มีชื่อโชว์จริง** · สร้างโครงการใหม่จากในฟอร์ม → `PROJECT-325` + ทรัพย์ `HSLY086` ได้ชื่อจากโครงการใหม่ (พิสูจน์ว่า policy `main_3` ที่รับ `listings.create` ใช้งานได้จริง) · เจ้าของถูกสร้างผ่าน `create_owner` + ผูก `owner_id` · `audit_log` ครบ (`changed_by='S-004'`) · trigger `main_9_support_log` เขียน `action='created'` เอง · **ลบข้อมูลทดสอบครบ ยอดกลับเป็น 511/308/452**
+
+---
+
+## 🔖 ก่อนหน้านี้ (2026-08-10)
 
 ### ✅ เสร็จ 2026-08-10: Phase 5 ข้อ 4 — มอบหมายลีดอัตโนมัติ (แมปชื่อ→รหัส) + `/assign` เขียนจริง
 **Ben เปลี่ยนทิศทางระหว่างวางแผน**: ไม่ต้องมีคนนั่งกดมอบหมายทีละราย เพราะลีดที่เข้ามา**ระบุชื่อเซลมาอยู่แล้ว** (ช่อง "Sales Assigned" ในฟอร์มรับลีด) ระบบควรแมปชื่อ → `employee_code` ให้เอง — **ข้อมูลจริงยืนยันว่าถูก: ลีด 952/953 มี `sale_id` ครบแล้ว** เหลือไม่มีคนดูแลแค่ 1 ราย
