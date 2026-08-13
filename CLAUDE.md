@@ -10,7 +10,7 @@
 
 ---
 
-## 📌 สถานะปัจจุบัน — อ่านตรงนี้ก่อน (อัปเดต 2026-08-08)
+## 📌 สถานะปัจจุบัน — อ่านตรงนี้ก่อน (อัปเดต 2026-08-13)
 
 **ระบบขึ้นของจริงแล้ว** ไม่ใช่เดโมอีกต่อไป — ข้อมูลจริงเข้าครบ + ต้อง login ถึงใช้ได้ + RLS ปิดครบแล้ว + **มี write path จุดแรกแล้ว** + **มีหน้าจัดการบัญชีผู้ใช้แล้ว**
 
@@ -21,11 +21,11 @@
 | สิทธิ์ | ✅ RBAC อยู่ใน DB — **36 สิทธิ์** · 8 บทบาท · ผูกกับพนักงานจริงแล้ว |
 | DB | ✅ **56 ตาราง** (+`lead_purpose`/`sell_reason` 2026-08-10) · เงินเดือน/PII ล็อกแล้ว · +3 function (`create_owner` Phase 5 ข้อ 1 · `create_lead` ข้อ 3 · `resolve_employee_code` ข้อ 4) |
 | ความปลอดภัย | ✅ **RLS Phase 4 ปิดครบแล้ว** — `demo_read_all` + anon ถูกถอนหมด (ดูรายละเอียดใต้ Phase 4) |
-| ⚠️ การบันทึก | 🟡 **เริ่มแล้ว 5/6 — เหลือแค่ติ๊กงาน `/today` จุดเดียว** (ดู Phase 5) |
+| ✅ การบันทึก | ✅ **Phase 5 ปิดครบ 6/6 แล้ว 2026-08-13** — ทุกปุ่ม save เขียน DB จริง |
 
 ### งานถัดไปตามลำดับ (ดูรายละเอียดเต็มที่ 🗺️ แผนเฟส ด้านล่าง)
-1. **Phase 5 (Write path)** — ต่อปุ่ม save ทุกหน้า: ~~แก้ทรัพย์~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ~~ ✅ → ~~เพิ่มลีด~~ ✅ → ~~มอบหมายลีด~~ ✅ → ~~เพิ่มทรัพย์~~ ✅ → **ติ๊กงาน `/today` (จุดสุดท้าย)**
-2. **Phase 6** — เชื่อมหน้าที่ยังอ่านจาก seed ในโค้ด (~9 หน้า: `/` `/today` `/contacts` `/projects` `/last-match` `/team` `/leave` `/new-sales` `/website`) ให้ query DB จริง
+1. ~~**Phase 5 (Write path)**~~ ✅ **เสร็จครบ 2026-08-13** — แก้ทรัพย์ · แก้ลีด/เปลี่ยนสเตจ · เพิ่มลีด · มอบหมายลีด · เพิ่มทรัพย์ · ติ๊กงาน `/today`
+2. **Phase 6 (งานถัดไป)** — เชื่อมหน้าที่ยังอ่านจาก seed ในโค้ด (~8 หน้า: `/` `/contacts` `/projects` `/last-match` `/team` `/leave` `/new-sales` `/website`) ให้ query DB จริง — `/today` ต่อเสร็จไปแล้วพร้อม Phase 5 ข้อ 6
 3. หน้าตั้งค่าโซนในเว็บยังเป็น 1 โซน 1 เซล ต้องแก้ให้รองรับหลายคน (DB รองรับแล้วผ่าน `zone_sales`)
 4. ~~หน้าจัดการบัญชีสำหรับ Admin~~ ✅ เสร็จ 2026-08-08 — ดู Phase 7
 
@@ -126,21 +126,24 @@ price_remark, unit_condition, close_type
 | 2 | Auth จริง (login/session/บังคับ + หน้าเปลี่ยนรหัส) | ✅ เสร็จ 2026-08-03 |
 | 3 | Import จากชีท (ครั้งเดียว ไม่มี two-way sync) | ✅ เสร็จ 2026-08-03 |
 | 4 | **RLS ทั้งระบบ + ถอน anon** | ✅ เสร็จ 2026-08-03 |
-| **5** | **Write path — ต่อปุ่ม save ทุกหน้า** | 🟡 **เริ่มแล้ว 1/6 — แก้ทรัพย์เขียนจริงแล้ว 2026-08-07** |
-| **6** | **เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง (~17 routes)** | 🔴 ยังไม่เริ่ม |
+| **5** | **Write path — ต่อปุ่ม save ทุกหน้า** | ✅ **เสร็จครบ 6/6 (2026-08-07 → 2026-08-13)** |
+| **6** | **เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง (~8 routes)** | 🔴 ยังไม่เริ่ม — งานถัดไป |
 | **7** | **งานแอดมิน/ops ที่ยังไม่มีที่ทำ** | 🟡 บางส่วน |
 | **8** | **ฟีเจอร์แยก (มีเอกสารของตัวเอง)** | ⬜ ยังไม่เริ่ม |
 
-### เฟส 5 — Write path (ต่อปุ่ม save) 🟡 เริ่มแล้ว 5/6
-**ทุกปุ่มบันทึกเคยเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย — **ข้อ 1 เสร็จ 2026-08-07 · ข้อ 2 เสร็จ 2026-08-08 · ข้อ 3-5 เสร็จ 2026-08-10/11** (รายละเอียดที่ 🔖 ค้างอยู่ตรงนี้ ด้านบน) · **store in-memory ยุค design-first ตายหมดแล้ว** (`NewLeadsProvider` ลบทิ้งทั้งไฟล์)
+### เฟส 5 — Write path (ต่อปุ่ม save) ✅ เสร็จครบ 6/6
+**ทุกปุ่มบันทึกเคยเป็น stub** state อยู่ใน React Provider รีเฟรชแล้วหาย — **ข้อ 1 เสร็จ 2026-08-07 · ข้อ 2 เสร็จ 2026-08-08 · ข้อ 3-5 เสร็จ 2026-08-10/11 · ข้อ 6 เสร็จ 2026-08-13** (รายละเอียดที่ 🔖 ค้างอยู่ตรงนี้ ด้านบน) · **store in-memory ยุค design-first ตายหมดแล้ว** (`NewLeadsProvider` ลบทิ้งทั้งไฟล์)
 - ✅ **ข่าวดี: policy ฝั่ง DB พร้อมแล้ว** — เฟส 4 เขียน insert/update/delete ครบทุกตาราง ต่อ write ได้เลยไม่โดน 403 (ยกเว้นเคสที่ต้องอ่านค่าที่ DB สร้างกลับมา ซึ่งต้องผ่าน RPC — `create_owner`, `create_lead`)
-- เรียงตามความคุ้ม: ~~แก้ทรัพย์ (`ListingEditSheet`)~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet` + แท็ก + ข้อร้องเรียน)~~ ✅ → ~~เพิ่มลีด (`LeadIntakeFab`)~~ ✅ → ~~มอบหมายลีด (`/assign` + แมปชื่อ→รหัสอัตโนมัติ)~~ ✅ → ~~เพิ่มทรัพย์ (`ListingIntakeButton`)~~ ✅ → **ติ๊กงาน `/today` (เขียน `tasks` + `activities`) — จุดสุดท้าย**
+- ครบแล้ว: ~~แก้ทรัพย์ (`ListingEditSheet`)~~ ✅ → ~~แก้ลีด/เปลี่ยนสเตจ (`LeadEditSheet` + แท็ก + ข้อร้องเรียน)~~ ✅ → ~~เพิ่มลีด (`LeadIntakeFab`)~~ ✅ → ~~มอบหมายลีด (`/assign` + แมปชื่อ→รหัสอัตโนมัติ)~~ ✅ → ~~เพิ่มทรัพย์ (`ListingIntakeButton`)~~ ✅ → ~~ติ๊กงาน `/today` (เขียน `tasks` + `activities` + `targets` + `user_quick_actions`)~~ ✅
+- ⚠️ **2 pattern ที่ต้องใช้กับ write path ทุกจุดต่อจากนี้** (เจอตอนข้อ 6): **ต้อง try/catch รอบ server action เสมอ** (reject ≠ `{ok:false}` — ถ้าไม่ catch จอจะโกหกว่าบันทึกแล้ว) · **ต้องคง busy ไว้จนกว่า `router.refresh()` จะลง** ด้วย `useTransition` (ไม่งั้นคลิกถัดไปทำงานกับ render เก่า)
 - ทุกจุดต้องเขียน `audit_log` ด้วย (`changed_by` = ตัวเอง ไม่งั้น policy ปฏิเสธ) — pattern อยู่ใน [lib/mutations/listings.ts](haus-crm/lib/mutations/listings.ts) และ [lib/mutations/leads.ts](haus-crm/lib/mutations/leads.ts) แล้ว ก็อบโครงได้เลย
 - ~~`main_6_buyer_crm.tag_id` มีคอลัมน์แล้วแต่แอปยังเก็บแท็กใน `NewLeadsProvider`~~ ✅ เขียนจริงแล้ว (ข้อ 2)
 
 ### เฟส 6 — เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง 🔴
-`/` แดชบอร์ด · `/today` แผนวันนี้ · `/contacts` · `/projects` · `/last-match` · `/team` · `/leave` · `/new-sales` · `/website` — ทั้งหมดยังอ่านจาก seed ใน `lib/*.ts`
+`/` แดชบอร์ด · `/contacts` · `/projects` · `/last-match` · `/team` · `/leave` · `/new-sales` · `/website` — ทั้งหมดยังอ่านจาก seed ใน `lib/*.ts` (~~`/today`~~ ✅ ต่อเสร็จแล้วพร้อม Phase 5 ข้อ 6 — ใช้ [lib/plan.ts](haus-crm/lib/plan.ts) เป็นแม่แบบได้)
 - **ตารางปลายทางมีครบแล้วทุกตัว** (สร้างไว้ 2026-08-03) เหลือแค่เปลี่ยน `lib/*.ts` ให้ query จริงผ่าน `lib/supabase/server.ts`
+- ⚠️ **หน้าที่เป็น "ของส่วนตัว" ต้องกรอง `employee_code` เองในโค้ด อย่าพึ่ง RLS** — policy หลายตัวเปิดให้ `roles.manage`/`performance.view_team` ด้วย (เจอจริงตอนต่อ `/today`)
+- `TODAY` ใน `lib/momentum.ts` (`@deprecated`) ยังมี 8 ไฟล์อ้างอยู่ — ลบได้เมื่อหน้า leave/new-sales/notifications/probation ต่อ DB เสร็จ
 - `/contacts` ต้อง **import + dedupe กับ `main_2_owner` ด้วยเบอร์โทร** (ตาราง `contacts` ยัง 0 แถว)
 - `/` แดชบอร์ดต้องมี `summary_*` rollup ก่อน (ยังไม่ได้ทำ)
 - `lib/zones.ts` + `ZonesAdmin` ยังเป็น 1 โซน 1 เซล ต้องแก้ให้ตรง `zone_sales` (many-to-many + `is_primary`)
@@ -156,7 +159,44 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 
 ---
 
-## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-11)
+## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-13)
+
+### ✅ เสร็จ 2026-08-13: Phase 5 ข้อ 6 — ติ๊กงาน `/today` เขียนจริง → **ปิด Phase 5 ครบ 6/6**
+**ทำเฉพาะ "ปุ่มติ๊ก" ไม่ได้** — ต่างจากข้อ 1-5 ที่หน้าอ่านข้อมูลจริงอยู่แล้ว `/today` **ยังเป็น seed ทั้งหน้า**: `tasks`/`targets`/`user_quick_actions` **ว่าง 0 แถวทั้ง 3 ตาราง** · `currentAgent()` ฮาร์ดโค้ด `"Stone"` · `TODAY` ฮาร์ดโค้ด `2026-07-13` · งานอยู่ใน React state (id `t_1`) → จะติ๊กให้เขียน DB ได้ ต้องมี "งานจริง" ที่มี id จาก DB ก่อน จึงต้องต่อ **อ่าน+เพิ่ม+แก้+ลบ** ทั้งชุด (= ข้อ 6 + ส่วน `/today` ของ Phase 6 รวบทำทีเดียว) **Ben สั่งเอาทั้ง 2 ฝั่ง** (แผนงาน + เป้าหมาย)
+
+**ไม่ต้องแตะ DB เลยรอบนี้** — schema + RLS ครบตั้งแต่ 2026-08-03 · `tasks`/`activities` policy เป็น own-row (`employee_code = current_employee_code()`) ซึ่ง SELECT ตัวเองได้ → **ไม่ต้องทำ RPC** ต่างจาก `create_owner`/`create_lead` · `activities.task_id` มี `unique` + `on delete cascade` ตามดีไซน์
+
+**ไฟล์ใหม่ (ใน `haus-crm/`)**: [lib/plan.ts](haus-crm/lib/plan.ts) (อ่านทั้งหน้า) · [lib/mutations/tasks.ts](haus-crm/lib/mutations/tasks.ts) · [lib/mutations/targets.ts](haus-crm/lib/mutations/targets.ts)
+**เขียนใหม่**: `lib/momentum.ts` (ตัด seed เหลือ type+helper, id เป็น `number`, `todayISO()`) · `DailyPlan.tsx` · `TargetsBoard.tsx` · `TaskDetailSheet.tsx` · `today/page.tsx` · `lib/quickAdd.ts` · +`searchLeads()` ใน `lib/search.ts`
+
+**🐛 บั๊กที่เจอ (มีมาก่อนงานนี้ทั้งหมด — จะระเบิดทันทีที่เริ่มเขียนจริง):**
+1. **ตัวเลือกลูกค้า/ทรัพย์ในฟอร์มงานเป็นของปลอม 7 ตัว** (`SAMPLE_LEAD_OPTIONS`/`SAMPLE_LISTING_OPTIONS`: `L-0007`, `TCYP001`…) ซึ่ง**ไม่มีอยู่ใน DB สักตัว** ทั้ง `tasks.related_lead_id` และ `activities.related_lead_id` เป็น FK → บันทึกล้มทุกครั้ง **ลบทิ้งทั้ง 2 ค่า** เปลี่ยนเป็น combobox ค้นจริง (debounce 250ms)
+2. **`ACTION_GROUPS` ขาด 3 กิจกรรมที่มีจริงใน `action_type`** — `Owner Talk` (ชื่อ KPI ทางการตัวแรกเลย) · `Update Price` · `เซ็นสัญญา` (seed 20 vs DB 23) → เปลี่ยนมาโหลดจากตารางจริง (บั๊กชุดเดียวกับ `COMPLAINT_STATUSES` / vocabulary ของฟอร์มลีด)
+3. ⚠️ **RLS เป็นเพดาน ไม่ใช่ตัวกรอง — ต้องกรอง `employee_code` เองทุก query** `tasks`/`targets` policy เปิดให้ `roles.manage` ด้วย และ `activities` เปิดให้ `performance.view_team` → ถ้าพึ่ง RLS อย่างเดียว **แผนงานของ Admin จะโชว์งานทั้งบริษัท** และเป้าหมายของหัวหน้าทีมจะนับกิจกรรมของลูกทีมเป็นของตัวเอง (จำไว้ใช้กับทุกหน้าที่เป็น "ของส่วนตัว" ใน Phase 6)
+
+**🐛 บั๊กที่งานนี้สร้างเองแล้วเจอตอนทดสอบ (แก้แล้ว — ทั้งคู่เป็น pattern ที่ต้องใช้กับ write path ทุกจุดต่อจากนี้):**
+- **A. `run()` ไม่มี try/catch** — server action **reject** ได้ (คนละเรื่องกับ return `{ok:false}`) เช่นเน็ตหลุด/request ถูก abort → `void run(...)` กลืน rejection, `busy` ค้าง true, ไม่ขึ้น error, **แต่ optimistic tick ยังโชว์ว่าติ๊กแล้ว** ทั้งที่ DB ไม่มีอะไรเลย (เจอจริง: งานถูก rollback เป็น `done=false` แต่จอขึ้น "เสร็จ 2 จาก 2")
+- **B. ปลด `busy` เร็วเกินไป** — เดิมปลดตอน action ตอบ แต่ `router.refresh()` ยังไม่ลง → คลิกติ๊กในช่วงนั้นทำงานกับ **render เก่า** ทำให้งานที่เพิ่งผูกกิจกรรมถูกติ๊ก**โดยข้ามหน้าต่างยืนยัน** count/remark หายเงียบ (พิสูจน์แล้ว: activity ได้ `remark=null`) **แก้ด้วย `useTransition` ครอบ `router.refresh()` แล้วนับ `isPending` เป็น busy ด้วย**
+
+**ทดสอบจริง (login เป็น Game / S-002 / role `agent` บน localhost — Ben ให้รหัสมาทดสอบ):**
+- ระดับ DB จำลอง session: สร้างงาน → ติ๊ก → เขียน activity → ยกเลิกติ๊ก → activity หาย → ลบงาน → cascade ครบ
+- เบราว์เซอร์จริง: หน้าโชว์ "แผนงานและเป้าหมายของ Game" + วันที่ **13/08/2026 (นาฬิกาจริง)** · เพิ่มงาน + ปุ่มลัด → เขียน `tasks` · ติ๊ก → หน้าต่างยืนยัน → `activities` count 3 → **เป้าหมาย auto ขยับเป็น 3/5 ทันที** · ยกเลิกติ๊ก → **กลับเป็น 0/5** (activity ถูกลบจริง) · ติ๊กใหม่ count 2 → 2/5
+- แก้งาน: dropdown มี **24 ตัวเลือก** (23 กิจกรรม + ไม่ผูก) ยืนยันว่ามี `Owner Talk`/`Update Price`/`เซ็นสัญญา` ครบ · ค้นทรัพย์ "HPHU" ได้ 8 รายการจริง → เลือก `HPHU001` → บันทึก → **แถวโชว์ชื่อโครงการจริง** → ติ๊ก → activity ได้ `related_listing_id='HPHU001'` + remark ถูก
+- ปุ่มลัด/ลบเป้าหมาย/ลบงาน ผ่านครบ · **0 console error ทุกรอบ**
+- **ลบข้อมูลทดสอบครบ** — tasks 0 · targets 0 · activities กลับเป็น **2334** (cascade เอา activity ไปด้วย) · user_quick_actions 0 · audit_log กลับเป็น 13 แถว · ทรัพย์ 511 / ลีด 953 เท่าเดิม
+
+**ค้างไว้ (ตั้งใจ ไม่ใช่ของลืม):**
+- **`targets` ยังตั้งได้เฉพาะของตัวเอง** — เป้าหมาย "ทางการ" ต้องมีหน้าจัดการทีม แต่ `teams` ยังว่าง → `visible_employee_codes()` = ตัวเองคนเดียวสำหรับทุกคนอยู่แล้ว ตั้งให้คนอื่นยังไง RLS ก็ปฏิเสธ (รอ CEO กำหนดหัวหน้าทีม)
+- `source='kpi'`/`'pipeline'` ยังอ่านค่าที่เก็บไว้ (`manual_current`) — ต้องมี `summary_kpi` rollup ก่อน (Phase 6)
+- **กฎ "ทำซ้ำ" บันทึกลง DB แล้วแต่ยังไม่สร้างงานของวันถัดไปให้** (มีข้อความบอกในฟอร์มแล้ว)
+- แบนเนอร์ "ลาวันนี้" ใน `/today` ยังอ่าน seed (`/leave` เป็น Phase 6) — เทียบด้วยชื่อเล่น ใครไม่อยู่ใน seed ก็ไม่ขึ้น
+- `TODAY` ใน `lib/momentum.ts` **ยังต้องคงไว้** (มี 8 ไฟล์ที่ยังเป็น seed อ้างอยู่: leave/probation/notifications/new-sales) — ทำเครื่องหมาย `@deprecated` ไว้แล้ว ลบตอน Phase 6
+
+**หมายเหตุเครื่องมือ**: แก้บั๊ก Windows ของ `browser-automation/browser.mjs` แล้ว — `--script` ใช้ `pathToFileURL()` แทน path ดิบ (เดิม path `C:\...` โดน ESM loader อ่านเป็น protocol `c:` แล้ว throw ใช้ `--script` บน Windows ไม่ได้เลย)
+
+---
+
+## 🔖 ก่อนหน้านี้ (2026-08-11)
 
 ### ✅ เสร็จ 2026-08-11: Phase 5 ข้อ 5 — เพิ่มทรัพย์เขียนจริง (`ListingIntakeButton` / `ListingForm`)
 ฟอร์มนี้ถูกออกแบบก่อน schema นิ่ง เลยมี **3 จุดที่เขียนตรงๆ ไม่ได้เลย** (เจอจาก query DB จริง):
@@ -454,9 +494,9 @@ Ben เห็นหน้า `/account` บน production (login เป็น Go
 
 - **เอกสารส่งมอบอยู่ในโฟลเดอร์แอป** อ่านตามลำดับนี้: [DATA_MODEL.md](haus-crm/DATA_MODEL.md) (บล็อก HANDOVER บนสุด) → [HANDOVER_CHECKLIST.md](haus-crm/HANDOVER_CHECKLIST.md) → [CEO_FEEDBACK_R1.md](haus-crm/CEO_FEEDBACK_R1.md)
 - ⚠️ **เอกสาร 3 ไฟล์นั้นเขียนไว้ตอนเฟสออกแบบ — หลายอย่างล้าสมัยแล้ว** (ขนาดข้อมูล · "ไม่มี auth" · "ทุก state อยู่ใน memory") ให้เชื่อ CLAUDE.md ไฟล์นี้ก่อน แล้วใช้ 3 ไฟล์นั้นดู**เหตุผลเบื้องหลังการออกแบบ** ซึ่งยังใช้ได้อยู่
-- ⚠️ **3 บรรทัดล่างนี้เป็นสถานะ ณ 2026-08-03 ที่ตกยุคไปแล้ว — อัปเดต 2026-08-10:**
-- **สิ่งที่ต่อของจริงแล้ว**: auth + session + สิทธิ์จาก DB · `/account` เปลี่ยนรหัส · จัดการบัญชีผู้ใช้ · อ่านข้อมูลจริงทุกหน้าลีด/ทรัพย์ · **เขียนจริงแล้ว 4/6 จุดของ Phase 5** (แก้ทรัพย์ · แก้ลีด/แท็ก/ข้อร้องเรียน · เพิ่มลีด · มอบหมายลีด)
-- **สิ่งที่ยังเป็นของปลอม**: ปุ่ม save ที่เหลือ 2 จุด (เพิ่มทรัพย์ · ติ๊กงาน `/today`) · store ในหน้า ตั้งค่า/กิจกรรม/วันลา ยังเก็บใน React Provider (refresh แล้วหาย) · ~9 หน้าที่ยังอ่าน seed (Phase 6)
+- ⚠️ **3 บรรทัดล่างนี้เป็นสถานะ ณ 2026-08-03 ที่ตกยุคไปแล้ว — อัปเดต 2026-08-13:**
+- **สิ่งที่ต่อของจริงแล้ว**: auth + session + สิทธิ์จาก DB · `/account` เปลี่ยนรหัส · จัดการบัญชีผู้ใช้ · อ่านข้อมูลจริงทุกหน้าลีด/ทรัพย์/แผนวันนี้ · **เขียนจริงครบ 6/6 จุดของ Phase 5** (แก้ทรัพย์ · แก้ลีด/แท็ก/ข้อร้องเรียน · เพิ่มลีด · มอบหมายลีด · เพิ่มทรัพย์ · ติ๊กงาน+เป้าหมาย `/today`)
+- **สิ่งที่ยังเป็นของปลอม**: store ในหน้า ตั้งค่า/กิจกรรม/วันลา ยังเก็บใน React Provider (refresh แล้วหาย) · ~8 หน้าที่ยังอ่าน seed (Phase 6)
 - **RBAC ใน `lib/rbac.ts` = สเปก** ย้ายเข้า DB แล้ว (ตาราง `roles`/`permissions`/`user_roles`) และ ✅ **RLS ปิดครบแล้วตั้งแต่ Phase 4** — DB ปฏิเสธจริง ไม่ใช่แค่ UI ซ่อนเมนู
 - **การตัดสินใจเรื่อง auth (Ben, 2026-08-03)**: login ด้วย **อีเมลส่วนตัว** (`main_1_hr.email` ไม่ใช่ `work_email`) และ **Admin ตั้งรหัสผ่านให้ user ได้** → ✅ **ทำแล้ว 2026-08-08** ที่ `/settings` → บัญชีผู้ใช้ (gate ด้วย `people.manage_accounts` ไม่ใช่ `people.manage` ตามที่คุยกันทีหลัง) · service_role key เก็บฝั่ง server เท่านั้น + ตั้งใน Vercel แล้ว 2026-08-10
 - **เป็น git repo แยก** (remote: `github.com/hauslivingestate-hash/haus-crm`) — repo แม่ gitignore โฟลเดอร์นี้ไว้ ต้อง `cd haus-crm` ก่อนทำ git ของแอป
