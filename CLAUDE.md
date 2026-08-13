@@ -127,7 +127,7 @@ price_remark, unit_condition, close_type
 | 3 | Import จากชีท (ครั้งเดียว ไม่มี two-way sync) | ✅ เสร็จ 2026-08-03 |
 | 4 | **RLS ทั้งระบบ + ถอน anon** | ✅ เสร็จ 2026-08-03 |
 | **5** | **Write path — ต่อปุ่ม save ทุกหน้า** | ✅ **เสร็จครบ 6/6 (2026-08-07 → 2026-08-13)** |
-| **6** | **เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง (~8 routes)** | 🔴 ยังไม่เริ่ม — งานถัดไป |
+| **6** | **เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง (~8 routes)** | 🟡 **เริ่มแล้ว 2/8** — `/projects` · `/last-match` (2026-08-13) |
 | **7** | **งานแอดมิน/ops ที่ยังไม่มีที่ทำ** | 🟡 บางส่วน |
 | **8** | **ฟีเจอร์แยก (มีเอกสารของตัวเอง)** | ⬜ ยังไม่เริ่ม |
 
@@ -140,7 +140,7 @@ price_remark, unit_condition, close_type
 - ~~`main_6_buyer_crm.tag_id` มีคอลัมน์แล้วแต่แอปยังเก็บแท็กใน `NewLeadsProvider`~~ ✅ เขียนจริงแล้ว (ข้อ 2)
 
 ### เฟส 6 — เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง 🔴
-`/` แดชบอร์ด · `/contacts` · `/projects` · `/last-match` · `/team` · `/leave` · `/new-sales` · `/website` — ทั้งหมดยังอ่านจาก seed ใน `lib/*.ts` (~~`/today`~~ ✅ ต่อเสร็จแล้วพร้อม Phase 5 ข้อ 6 — ใช้ [lib/plan.ts](haus-crm/lib/plan.ts) เป็นแม่แบบได้)
+เหลือ 6 หน้า: `/` แดชบอร์ด · `/contacts` · `/team` · `/leave` · `/new-sales` · `/website` (~~`/today`~~ ✅ พร้อม Phase 5 ข้อ 6 · ~~`/projects`~~ ~~`/last-match`~~ ✅ 2026-08-13) — ใช้ [lib/plan.ts](haus-crm/lib/plan.ts) หรือ [lib/queries.ts](haus-crm/lib/queries.ts) เป็นแม่แบบได้
 - **ตารางปลายทางมีครบแล้วทุกตัว** (สร้างไว้ 2026-08-03) เหลือแค่เปลี่ยน `lib/*.ts` ให้ query จริงผ่าน `lib/supabase/server.ts`
 - ⚠️ **หน้าที่เป็น "ของส่วนตัว" ต้องกรอง `employee_code` เองในโค้ด อย่าพึ่ง RLS** — policy หลายตัวเปิดให้ `roles.manage`/`performance.view_team` ด้วย (เจอจริงตอนต่อ `/today`)
 - `TODAY` ใน `lib/momentum.ts` (`@deprecated`) ยังมี 8 ไฟล์อ้างอยู่ — ลบได้เมื่อหน้า leave/new-sales/notifications/probation ต่อ DB เสร็จ
@@ -160,6 +160,23 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 ---
 
 ## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-13)
+
+### 🟡 กำลังทำ: Phase 6 — เชื่อมหน้าที่ยังอ่าน seed (เสร็จ 2/8: `/projects` · `/last-match`)
+**เสร็จรอบนี้:**
+- **`/projects` + `/projects/[id]`** — อ่าน `main_3_property_detail` จริง **308 โครงการ** · id เปลี่ยนจาก slug เป็น `project_id` จริง (`PROJECT-006`) · แมปชื่อคอลัมน์ที่ไม่ตรงกัน (`units`←total_units · `age`←project_age · `common_area`←facilities · `resident_persona`←resident_occupation · `closing_price`←project_sold_price) · `flooding` เป็น boolean → แปลงเป็น "เคยท่วม"/"ไม่ท่วม" โดย **null ต้องยังเป็น "ไม่ระบุ"** (ไม่ใช่ "ไม่ท่วม")
+- **`/last-match`** — อ่าน `main_7_last_match` จริง 56 แถว · **ถอด client-side scoping ทิ้ง** เพราะ RLS ทำ own/team/all ให้อยู่แล้ว (ของเดิมเทียบ seed user id กับ seed employee code → session จริงไม่เคยแมตช์ จะทำให้ตารางว่าง) เหลือ `matchScope()` ไว้ตัดสินแค่ว่าจะโชว์คอลัมน์ "เซลส์" ไหม
+- **`listings/[id]` → โครงการ** — เลิกเทียบชื่ออังกฤษแบบหลวมๆ เปลี่ยนไปใช้ FK `project_id` ตรงๆ (ชีทใส่ชื่อไทยในช่องอังกฤษ เทียบชื่อเจอ 1/508)
+
+**🐛 บั๊กที่เจอระหว่างทาง (ทั้งหมดมีมาก่อน แก้แล้ว):**
+1. 🔴 **`lib/listings.ts` สุ่มผู้ดูแลทรัพย์จาก hash ของ listing_id** — `listingAgent()` เป็นของยุค design-first แต่ยังใช้อยู่จริงใน **`/company-listings`** (หน้าที่มีไว้หา Co-Agent) และ **`ListingOwnerCard`** → **เบอร์โทรที่โชว์เป็นของเพื่อนร่วมงานที่สุ่มมา** และ `isManager` (ตัวตัดสินว่าจะโชว์เบอร์เจ้าของไหม) ก็ตัดสินจากคนสุ่มนั้น (RLS ยังกันข้อมูลจริงอยู่ แต่ UI ไม่ตรงกับ RLS) — **แก้: ใช้ `effective_sale_id` จริง + `getStaffDirectory()` · คำนวณ `isManager` ที่ server จาก employee_code ของ session · ลบ `lib/listings.ts` ทั้งไฟล์**
+2. **หน้าทรัพย์โชว์ UUID ดิบ** — ช่อง "ผู้ดูแล" อ่าน `created_by` ซึ่งเก็บ `auth.users.id` และ **ทั้ง 511 แถวเป็น uuid เดียวกัน** (บัญชี admin ที่รัน import) → โชว์ `1fa17e8b-...` กลางจอ · แก้เป็นแมปเป็นชื่อเล่น + **เปลี่ยนป้ายเป็น "ผู้สร้างรายการ"** (ผู้ดูแลจริงมีการ์ดของตัวเองอยู่แล้ว)
+3. **`main_7_last_match.date_created` มี 6 แถวเป็น `1899-12-30`** (Excel serial-zero = ช่องวันที่ว่างตอน import) โชว์เป็น "30/12/1899" — **กันที่ชั้นอ่าน** (วันที่ก่อนปี 2000 = ไม่ระบุ) **ยังไม่ได้แตะข้อมูลใน DB** → ถ้า Ben อยากให้ล้างเป็น null สั่งได้
+   - เช็คแล้วคอลัมน์วันที่อื่นไม่โดน (main_4/main_6/main_3/activities/birthday = 0)
+
+**ทดสอบแล้ว (login Game/S-002 บน localhost)**: `/projects` 308 + ชิปโซนเป็นชื่อไทยครบ 24 โซน ตรงกับ `count(*)` ใน DB · เปิด `PROJECT-006` เห็นข้อมูลจริง 42% · id มั่ว → 404 · `listings/HPHU001` → ลิงก์ไป `/projects/PROJECT-207` ถูก · `/last-match` Game เห็น **1 แถว** (มีจริง 1 แถวใน DB → RLS own-scope ถูก) · ไม่มี 1899 · ไม่มี UUID · `/company-listings` 511 แถว **ผู้ดูแล+เบอร์ตรงกับ DB ทุกแถวที่สุ่มเช็ค** (CCRK026→Mhow · CCWT086/CPCC078→Golf) · 0 console error
+
+**ค้าง**: คอลัมน์ "เซลส์" ใน `/last-match` โชว์เฉพาะคนที่มี `lastmatch.view_team/all` — บัญชีที่ใช้ทดสอบเป็น agent เลย**ยังไม่ได้เห็นคอลัมน์นั้นจริงในเบราว์เซอร์** (ตรวจที่ระดับ query แล้วว่าแมปชื่อเล่นถูก)
+
 
 ### ✅ เสร็จ 2026-08-13: Phase 5 ข้อ 6 — ติ๊กงาน `/today` เขียนจริง → **ปิด Phase 5 ครบ 6/6**
 **ทำเฉพาะ "ปุ่มติ๊ก" ไม่ได้** — ต่างจากข้อ 1-5 ที่หน้าอ่านข้อมูลจริงอยู่แล้ว `/today` **ยังเป็น seed ทั้งหน้า**: `tasks`/`targets`/`user_quick_actions` **ว่าง 0 แถวทั้ง 3 ตาราง** · `currentAgent()` ฮาร์ดโค้ด `"Stone"` · `TODAY` ฮาร์ดโค้ด `2026-07-13` · งานอยู่ใน React state (id `t_1`) → จะติ๊กให้เขียน DB ได้ ต้องมี "งานจริง" ที่มี id จาก DB ก่อน จึงต้องต่อ **อ่าน+เพิ่ม+แก้+ลบ** ทั้งชุด (= ข้อ 6 + ส่วน `/today` ของ Phase 6 รวบทำทีเดียว) **Ben สั่งเอาทั้ง 2 ฝั่ง** (แผนงาน + เป้าหมาย)
