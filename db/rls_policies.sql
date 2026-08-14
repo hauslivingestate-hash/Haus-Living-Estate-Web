@@ -629,3 +629,67 @@ $do$;
 --     Admin / CEO / หัวหน้าทีม / Listing Support = เห็นทั้งหมด · Marketing = ไม่เห็นเลย
 --     (ทั้งหมดนี้คือสิ่งที่ §6 กับ §11 ด้านบนเขียนไว้อยู่แล้ว — ไม่ต้องรันอะไรเพิ่ม)
 -- ============================================================
+
+-- ============================================================
+-- 14) 2026-08-14 — เซลล์ใหม่ (โปรเบชั่น) + กติกาใบลาที่แคบลง
+-- ============================================================
+
+-- 14.1 บันไดขั้นเซลล์ใหม่ — อ่านได้ทุกคนที่ login (เซลบนกระดานต้องเห็นเกณฑ์ของตัวเอง)
+--      แก้ได้เฉพาะคนคุมข้อมูลกลาง เหมือน zone / action_type
+-- ⚠️ ตารางใหม่ทุกตารางต้องเขียน policy เอง — rls_auto_enable() ของ Supabase เปิด RLS ให้
+--    อัตโนมัติ ถ้าไม่มี policy จะอ่านไม่ได้เลย (เจอมาแล้วตอนทำ lead_purpose/sell_reason)
+alter table public.probation_rank enable row level security;
+alter table public.rank_criterion enable row level security;
+revoke all on public.probation_rank, public.rank_criterion from anon;
+grant select, insert, update, delete on public.probation_rank, public.rank_criterion to authenticated;
+
+drop policy if exists p_select on public.probation_rank;
+create policy p_select on public.probation_rank for select to authenticated using (true);
+drop policy if exists p_insert on public.probation_rank;
+create policy p_insert on public.probation_rank for insert to authenticated
+  with check ((select has_perm('masterdata.govern')) or (select has_perm('roles.manage')));
+drop policy if exists p_update on public.probation_rank;
+create policy p_update on public.probation_rank for update to authenticated
+  using      ((select has_perm('masterdata.govern')) or (select has_perm('roles.manage')))
+  with check ((select has_perm('masterdata.govern')) or (select has_perm('roles.manage')));
+drop policy if exists p_delete on public.probation_rank;
+create policy p_delete on public.probation_rank for delete to authenticated
+  using ((select has_perm('masterdata.govern')) or (select has_perm('roles.manage')));
+
+drop policy if exists p_select on public.rank_criterion;
+create policy p_select on public.rank_criterion for select to authenticated using (true);
+drop policy if exists p_insert on public.rank_criterion;
+create policy p_insert on public.rank_criterion for insert to authenticated
+  with check ((select has_perm('masterdata.govern')) or (select has_perm('roles.manage')));
+drop policy if exists p_update on public.rank_criterion;
+create policy p_update on public.rank_criterion for update to authenticated
+  using      ((select has_perm('masterdata.govern')) or (select has_perm('roles.manage')))
+  with check ((select has_perm('masterdata.govern')) or (select has_perm('roles.manage')));
+drop policy if exists p_delete on public.rank_criterion;
+create policy p_delete on public.rank_criterion for delete to authenticated
+  using ((select has_perm('masterdata.govern')) or (select has_perm('roles.manage')));
+
+-- 14.2 🔴 GRANT ระดับคอลัมน์ของ main_1_hr — ส่วนนี้เคยรันสดตอน 2026-08-03 แต่ไม่เคยถูก
+--      บันทึกลงไฟล์ ทำให้ setup ใหม่จะได้ฐานที่ "เงินเดือน/PII อ่านได้หมด" เงียบ ๆ
+--      ⚠️⚠️ เพิ่มคอลัมน์ใหม่ใน main_1_hr เมื่อไหร่ ต้อง grant คอลัมน์นั้นด้วยเสมอ
+--      เพราะตารางนี้ไม่มี grant ระดับตารางให้สืบทอด — 2026-08-14 เพิ่ม probation_start/
+--      probation_passed_at แล้วลืม grant ทำให้ทุกหน้าที่แตะ main_1_hr พังหมด
+--      (PostgREST ล้มทั้ง query → "permission denied for table main_1_hr")
+revoke select on public.main_1_hr from anon, authenticated;
+grant select (
+  employee_code, status, division, position, second_position,
+  first_name_en, last_name_en, first_name_th, last_name_th, nickname,
+  gender, nationality, phone, additional_phone, email, work_email,
+  birthday, date_started, probation_start, probation_passed_at,
+  emergency_contact, emergency_contact_phone, emergency_contact_relationship,
+  remark, line_userid, sales_sheet_url, team_id, auth_user_id, created_at
+) on public.main_1_hr to authenticated;
+-- ไม่มีในลิสต์โดยตั้งใจ (อ่านได้ทางเดียวคือ v_employee_private ซึ่งเช็คสิทธิ์ทีละคอลัมน์):
+--   salary · commission · id_card_no · kbank_account · payslip_drive · agreement_files
+-- ⚠️ UPDATE ไม่ได้ถูกถอน — คนที่ผ่าน policy `people.manage` เขียนทับคอลัมน์เหล่านี้ได้
+--    ทั้งที่อ่านไม่ได้ ด่านที่กันจริงอยู่ที่ชั้นแอป (lib/mutations/employees.ts FIELDS[].group)
+
+-- 14.3 ใบลา — ท่อน "แถวของตัวเอง" ต้องมี status='pending' ด้วย
+--      ของเดิมไม่มี → เซลยิง REST อัปเดตใบลาตัวเองเป็น 'approved' ได้ (ดูหัวข้อใบลาด้านบน
+--      ซึ่งแก้ไว้แล้ว — ย้ำไว้ตรงนี้เพราะเป็นบทเรียนเดียวกัน: `with check` ต้องมีเงื่อนไขด้วย
+--      ไม่ใช่แค่ `using` ไม่งั้นการแก้ pending → approved ยังผ่าน)

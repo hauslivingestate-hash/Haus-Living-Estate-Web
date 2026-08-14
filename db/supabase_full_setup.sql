@@ -22,6 +22,8 @@ drop table if exists main_5_lead_database     cascade;
 drop table if exists main_4_listing_database  cascade;
 drop table if exists main_3_property_detail        cascade;
 drop table if exists main_2_owner             cascade;
+drop table if exists rank_criterion            cascade;
+drop table if exists probation_rank            cascade;
 drop table if exists main_1_hr                cascade;
 -- ชื่อเก่า เผื่อเคยรันไว้ (ก่อนใส่เลขนำหน้า main_1_..main_10_)
 drop table if exists main_listing_photo    cascade;
@@ -268,6 +270,13 @@ create table main_1_hr (
   -- ลิงก์ชีทรายคน (HR Sheet คอลัมน์ U) — บางคนมีหลายลิงก์คั่น comma
   -- ใช้ตอน backfill ว่า listing ไหนเป็นของเซลคนไหน (created_by ในชีททรัพย์เป็น Stone ทั้งหมด)
   sales_sheet_url text,
+  -- โปรแกรมเซลล์ใหม่ (โปรเบชั่น) — เป็น "ข้อเท็จจริง" ไม่ derive จาก date_started
+  -- (ทุกคนเริ่มงานวันเดียวกัน 2025-11-01 จะ derive ยังไงก็ได้ทั้งทีมหรือไม่ได้เลย)
+  -- probation_start   null = ไม่เคยเข้าโปรแกรม · เกณฑ์แบบ total นับกิจกรรมตั้งแต่วันนี้
+  -- probation_passed_at  ตั้งแล้ว = ออกจากโปรแกรมถาวร (เก็บไว้ไม่ derive เพราะเกณฑ์แบบ
+  --                      monthly ที่เดือนนี้ทำไม่ถึงจะทำให้ "ไม่ผ่าน" ย้อนหลังได้)
+  probation_start     date,
+  probation_passed_at date,
   -- สะพาน Auth <-> พนักงาน: ทุก RLS policy วิ่งผ่านตรงนี้ (auth.uid() -> employee_code)
   -- null = ยังไม่มีบัญชี login (เช่น พนักงานที่ลาออกแล้ว)
   auth_user_id    uuid unique references auth.users (id) on delete set null,
@@ -1133,6 +1142,41 @@ create index idx_leave_emp on leave_requests (employee_code);
 -- ไม่มี permission gate: ทุกคนมีกระดิ่ง การกรองแถว (RLS) คือความปลอดภัยทั้งหมด
 -- ⚠️ body ของ deal_won มีมูลค่าดีล ถ้า scope ผิด = หลุดตัวเลขเงินที่ financials.view_comp กันไว้
 -- ข้อความเก็บเป็นข้อความสำเร็จรูป (ไม่ใช่ template) — แก้คำทีหลังไม่ย้อนไปแถวเก่า
+-- ============================================================
+-- บันไดขั้นเซลล์ใหม่ (โปรเบชั่น) — CEO แก้ที่ ตั้งค่า → Rank เซลล์ใหม่
+-- เดิมอยู่ใน React Provider แบบ in-memory (แก้แล้วรีเฟรชหาย) ย้ายเข้า DB 2026-08-14
+-- Rank เรียงตาม sort_order · ผ่าน Rank สุดท้าย = ผ่านโปรเบชั่น
+-- ============================================================
+create table probation_rank (
+  id          text primary key,
+  name        text not null,
+  sort_order  int  not null default 0,
+  created_at  timestamptz not null default now()
+);
+
+create table rank_criterion (
+  id            text primary key,
+  rank_id       text not null references probation_rank (id) on delete cascade,
+  -- vocabulary ชุดเดียวกับ ประเภทกิจกรรม / KPI — อย่าทำลิสต์แยก
+  activity_type text not null references action_type (name) on update cascade,
+  target        int  not null check (target > 0),
+  -- `window` เป็นคำสงวนของ SQL จึงต้องเติมคำนำหน้า
+  count_window  text not null check (count_window in ('total','monthly')),
+  sort_order    int  not null default 0
+);
+create index ix_rank_criterion_rank on rank_criterion (rank_id);
+
+insert into probation_rank(id, name, sort_order) values
+  ('r_rookie','Rookie',1), ('r_junior','Junior',2), ('r_pro','Senior',3);
+insert into rank_criterion(id, rank_id, activity_type, target, count_window, sort_order) values
+  ('c_r1_call','r_rookie','Call',20,'total',1),
+  ('c_r1_survey','r_rookie','Survey',5,'total',2),
+  ('c_r2_call','r_junior','Call',30,'monthly',1),
+  ('c_r2_show','r_junior','Show',5,'total',2),
+  ('c_r2_owner','r_junior','Owner Visit',4,'total',3),
+  ('c_r3_show','r_pro','Show',10,'total',1),
+  ('c_r3_win','r_pro','Win',1,'total',2);
+
 create table notifications (
   id            bigint generated always as identity primary key,
   employee_code text not null references main_1_hr (employee_code) on update cascade on delete cascade,
