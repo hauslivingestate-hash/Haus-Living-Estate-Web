@@ -373,14 +373,19 @@ create policy p_select on public.leave_requests for select to authenticated
 create policy p_insert on public.leave_requests for insert to authenticated
   with check ((select has_perm('leave.manage')) or (select has_perm('roles.manage'))
               or ((select has_perm('leave.request')) and employee_code = (select current_employee_code())));
+-- ⚠️ ท่อนของตัวเองต้องมี status='pending' ด้วยเสมอ (แก้ 2026-08-14 ตอนต่อหน้า /leave)
+-- ของเดิมเป็น "แถวของตัวเอง" ล้วน ๆ → เซลยิง REST อัปเดตใบลาตัวเองเป็น 'approved' ได้เอง
+-- (พิสูจน์แล้วว่าทำได้จริงก่อนแก้) ตัวที่กันอยู่มีแค่ด่านในแอป ซึ่งไม่ใช่ด่านสุดท้าย
+-- `with check` ก็ต้องมีเงื่อนไขเดียวกัน ไม่งั้นแก้จาก pending → approved ยังผ่าน
 create policy p_update on public.leave_requests for update to authenticated
   using      ((select has_perm('leave.manage')) or (select has_perm('roles.manage'))
-              or employee_code = (select current_employee_code()))
+              or (employee_code = (select current_employee_code()) and status = 'pending'))
   with check ((select has_perm('leave.manage')) or (select has_perm('roles.manage'))
-              or employee_code = (select current_employee_code()));
+              or (employee_code = (select current_employee_code()) and status = 'pending'));
+-- ลบใบลาที่ตัดสินไปแล้ว = ลบหลักฐานการตัดสิน จึงเหลือเฉพาะ pending เหมือนกัน
 create policy p_delete on public.leave_requests for delete to authenticated
   using ((select has_perm('leave.manage')) or (select has_perm('roles.manage'))
-         or employee_code = (select current_employee_code()));
+         or (employee_code = (select current_employee_code()) and status = 'pending'));
 
 
 -- ============================================================

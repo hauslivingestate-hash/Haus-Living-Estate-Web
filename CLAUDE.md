@@ -21,11 +21,11 @@
 | สิทธิ์ | ✅ RBAC อยู่ใน DB — **36 สิทธิ์** · 8 บทบาท · ผูกกับพนักงานจริงแล้ว |
 | DB | ✅ **56 ตาราง** (+`lead_purpose`/`sell_reason` 2026-08-10) · เงินเดือน/PII ล็อกแล้ว · +3 function (`create_owner` Phase 5 ข้อ 1 · `create_lead` ข้อ 3 · `resolve_employee_code` ข้อ 4) |
 | ความปลอดภัย | ✅ **RLS Phase 4 ปิดครบแล้ว** — `demo_read_all` + anon ถูกถอนหมด (ดูรายละเอียดใต้ Phase 4) |
-| ✅ การบันทึก | ✅ **Phase 5 ปิดครบ 6/6 แล้ว 2026-08-13** — ทุกปุ่ม save เขียน DB จริง |
+| ✅ การบันทึก | ✅ **Phase 5 ปิดครบ 6/6 แล้ว 2026-08-13** — ทุกปุ่ม save เขียน DB จริง · +ใบลา/ประวัติพนักงาน (2026-08-14) |
 
 ### งานถัดไปตามลำดับ (ดูรายละเอียดเต็มที่ 🗺️ แผนเฟส ด้านล่าง)
 1. ~~**Phase 5 (Write path)**~~ ✅ **เสร็จครบ 2026-08-13** — แก้ทรัพย์ · แก้ลีด/เปลี่ยนสเตจ · เพิ่มลีด · มอบหมายลีด · เพิ่มทรัพย์ · ติ๊กงาน `/today`
-2. **Phase 6 (งานถัดไป)** — เชื่อมหน้าที่ยังอ่านจาก seed ในโค้ด (~8 หน้า: `/` `/contacts` `/projects` `/last-match` `/team` `/leave` `/new-sales` `/website`) ให้ query DB จริง — `/today` ต่อเสร็จไปแล้วพร้อม Phase 5 ข้อ 6
+2. **Phase 6 (กำลังทำ — 5/8)** — เหลือ **`/` แดชบอร์ด** (ต้องถาม Ben ก่อนว่าจะเปิดของเดิมหรือทำใหม่) · **`/new-sales`** (ติดที่ `date_started` ว่างทั้ง 10 คน รอ HR) · **`/website`** (เป็นฟีเจอร์ Phase 8)
 3. หน้าตั้งค่าโซนในเว็บยังเป็น 1 โซน 1 เซล ต้องแก้ให้รองรับหลายคน (DB รองรับแล้วผ่าน `zone_sales`)
 4. ~~หน้าจัดการบัญชีสำหรับ Admin~~ ✅ เสร็จ 2026-08-08 — ดู Phase 7
 
@@ -127,7 +127,7 @@ price_remark, unit_condition, close_type
 | 3 | Import จากชีท (ครั้งเดียว ไม่มี two-way sync) | ✅ เสร็จ 2026-08-03 |
 | 4 | **RLS ทั้งระบบ + ถอน anon** | ✅ เสร็จ 2026-08-03 |
 | **5** | **Write path — ต่อปุ่ม save ทุกหน้า** | ✅ **เสร็จครบ 6/6 (2026-08-07 → 2026-08-13)** |
-| **6** | **เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง (~8 routes)** | 🟡 **เริ่มแล้ว 3/8** — `/projects` · `/last-match` · `/contacts` (2026-08-13) |
+| **6** | **เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง (~8 routes)** | 🟡 **5/8** — `/projects` · `/last-match` · `/contacts` (08-13) · `/leave` · `/team` (08-14) |
 | **7** | **งานแอดมิน/ops ที่ยังไม่มีที่ทำ** | 🟡 บางส่วน |
 | **8** | **ฟีเจอร์แยก (มีเอกสารของตัวเอง)** | ⬜ ยังไม่เริ่ม |
 
@@ -139,8 +139,9 @@ price_remark, unit_condition, close_type
 - ทุกจุดต้องเขียน `audit_log` ด้วย (`changed_by` = ตัวเอง ไม่งั้น policy ปฏิเสธ) — pattern อยู่ใน [lib/mutations/listings.ts](haus-crm/lib/mutations/listings.ts) และ [lib/mutations/leads.ts](haus-crm/lib/mutations/leads.ts) แล้ว ก็อบโครงได้เลย
 - ~~`main_6_buyer_crm.tag_id` มีคอลัมน์แล้วแต่แอปยังเก็บแท็กใน `NewLeadsProvider`~~ ✅ เขียนจริงแล้ว (ข้อ 2)
 
-### เฟส 6 — เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง 🔴
-เหลือ 5 หน้า: `/` แดชบอร์ด · `/team` · `/leave` · `/new-sales` · `/website` (~~`/today`~~ ✅ พร้อม Phase 5 ข้อ 6 · ~~`/projects`~~ ~~`/last-match`~~ ~~`/contacts`~~ ✅ 2026-08-13) — ใช้ [lib/plan.ts](haus-crm/lib/plan.ts) หรือ [lib/queries.ts](haus-crm/lib/queries.ts) เป็นแม่แบบได้
+### เฟส 6 — เชื่อมหน้าที่ยังเป็นข้อมูลตัวอย่าง 🟡
+เหลือ 3 หน้า: `/` แดชบอร์ด · `/new-sales` · `/website` (~~`/today`~~ ✅ พร้อม Phase 5 ข้อ 6 · ~~`/projects`~~ ~~`/last-match`~~ ~~`/contacts`~~ ✅ 08-13 · ~~`/leave`~~ ~~`/team`~~ ✅ 08-14) — ใช้ [lib/plan.ts](haus-crm/lib/plan.ts) หรือ [lib/queries.ts](haus-crm/lib/queries.ts) เป็นแม่แบบได้
+- ⚠️ **RLS หลายตารางเป็น own-row → คอลัมน์ที่โชว์ค่าของ "คนอื่น" จะโกหกเงียบ ๆ** เจอมาแล้ว 3 ตาราง: `activities` · `user_roles` · `tasks`/`targets` — **แยกให้ออกระหว่าง "0" กับ "คุณไม่มีสิทธิ์เห็น"** ถ้าเห็นไม่ได้ให้เป็น `null` → "—" หรือซ่อนทั้งคอลัมน์ อย่าปล่อยเป็น 0/ว่าง
 - **`/` แดชบอร์ดไม่ได้ติดข้อมูล** — [app/(app)/page.tsx](haus-crm/app/(app)/page.tsx) ถูกตั้งใจแทนที่ด้วยหน้า "เร็วๆ นี้" (คอมเมนต์ในไฟล์บอกวิธีเปิดคืน) · `components/dashboard/*` + `lib/dashboard.ts` ยังอยู่ครบ → ต้องถาม Ben ก่อนว่าจะเปิดของเดิมหรือปรับใหม่
 - **`/new-sales` ติดของจริง** — ต้องใช้ `date_started` ซึ่งว่างทั้ง 10 คน (รอ HR) คำนวณจากอะไรไม่ได้เลย
 - **ตารางปลายทางมีครบแล้วทุกตัว** (สร้างไว้ 2026-08-03) เหลือแค่เปลี่ยน `lib/*.ts` ให้ query จริงผ่าน `lib/supabase/server.ts`
@@ -160,7 +161,41 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 
 ---
 
-## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-13)
+## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-14)
+
+### ✅ เสร็จ 2026-08-14: Phase 6 — `/leave` · `/team` (5/8 แล้ว) + ปิดช่องโหว่ RLS 1 จุด
+**commit**: `98f9145` (/leave) · `71033ea` (/team) — push แล้วทั้งคู่
+
+#### `/leave` (ใบลา 20 · โควตา 6)
+ไฟล์ใหม่ [lib/mutations/leave.ts](haus-crm/lib/mutations/leave.ts) (`submitLeave`/`decideLeave`/`withdrawLeave`/`setLeaveAllowance`) · `getLeaveRequests()`/`getLeaveAllowances()` ใน [lib/queries.ts](haus-crm/lib/queries.ts) · `LeaveProvider` เลิกถือความจริงเอง รับจาก layout · **`RbacProvider` เพิ่ม `employeeCode`** (ของเดิม client เทียบ seed id `u_game` กับ employee_code จึงไม่เคยตรง = "ใบลาของฉัน" ว่างตลอดสำหรับ user จริง)
+
+🔴 **ช่องโหว่ที่เจอ + ปิดแล้ว (apply บน production + มิเรอร์ลง `db/rls_policies.sql`)** — migration `leave_requests_own_update_pending_only`
+`p_update` ท่อน "แถวของตัวเอง" **ไม่มีเงื่อนไข status** → เซลยิง REST `PATCH /leave_requests?id=eq.6 {"status":"approved"}` **อนุมัติใบลาตัวเองได้จริง** (ทดสอบยืนยันก่อนแก้) · ตัวที่กันอยู่มีแค่ด่านในแอป ซึ่งไม่ใช่ด่านสุดท้าย → เพิ่ม `and status='pending'` ทั้ง `using` และ **`with check`** (ถ้าใส่แต่ `using` การแก้ pending→approved ยังผ่าน) · `p_delete` ด้วยเหตุผลเดียวกัน (ลบใบที่ตัดสินแล้ว = ลบหลักฐาน)
+- ยืนยันหลังแก้: เซลอนุมัติตัวเอง **0 แถว** · เซลลบใบที่ตัดสินแล้ว **ไม่ได้** · เซลยกเลิกใบ pending ของตัวเอง **ยังได้** · CEO อนุมัติ **ยังได้**
+
+🐛 แบนเนอร์ `/today` เขียน "คุณลา**ลาป่วย**วันนี้" (ประเภทลาขึ้นต้นด้วย "ลา" อยู่แล้ว) — แก้แล้ว
+
+#### `/team` (พนักงาน 10) — **ลบ PII ปลอมของคนจริงทิ้ง**
+`lib/team.ts` เคยเก็บรายชื่อเพื่อนร่วมงานจริงทั้ง 10 คน **พร้อมเงินเดือน/เลขบัตร ปชช./เลขบัญชีที่แต่งขึ้น** → ลบทั้งก้อน เหลือแค่ type + helper
+- **อ่าน**: `getEmployees()`/`getEmployee()`/`getZoneOptions()` — `main_1_hr` + `zone_sales`+`zone` + `user_roles`+`roles` + `teams` + **`v_employee_private`** (คอลัมน์อ่อนไหวถูก revoke ที่ base table มาทางอื่นไม่ได้)
+- **เขียน**: [lib/mutations/employees.ts](haus-crm/lib/mutations/employees.ts) `updateEmployee`/`createEmployee` (เดิม `save()` เป็น `console.log`)
+  ⚠️ **`update` บนคอลัมน์เงินเดือน/PII ไม่เคยถูก revoke — revoke แค่ `select`** → ใครมี `people.manage` เขียนทับได้ทั้งที่อ่านไม่ได้ ด่านเดียวที่กันคือ `FIELDS[].group` ในไฟล์นี้ **write path อื่นที่แตะ `main_1_hr` ต้องทำซ้ำ**
+  ⚠️ **ห้ามรับ `employee_code` จากฟอร์ม** — trigger `set_hr_employee_code` อ่าน `second_position` ก่อน (Sales→S, Support→SP) แล้วค่อย fallback ไป `position` (CEO→C) → ส่ง `'Sales'` ให้ CEO จะได้ `S-006` ไม่ใช่ `C-002` ดังนั้น "ผู้บริหาร" ต้องส่ง `second_position = null` (ทดสอบครบ 3 ทาง: S-006 / SP-004 / C-002)
+
+🐛 **2 คอลัมน์ที่เคยโกหกเพราะ RLS เป็น own-row** (pattern เดียวกับ Phase 5 ข้อ 6):
+1. **กิจกรรมเดือนนี้** — `activities` own-row (`performance.view_team` + `visible_employee_codes()` ซึ่ง = ตัวเองคนเดียวเพราะ `teams` ว่าง) → เดิมจะโชว์ **0** ให้ทุกคนที่ไม่ใช่ตัวเอง = บอกว่าเขาไม่ทำงาน · แก้เป็น `null` → "—"
+2. **บทบาท** — `user_roles` own-row เหมือนกัน → เดิมโชว์ "—" ให้เพื่อนทุกคนราวกับไม่มีบทบาท · แก้เป็น**ซ่อนคอลัมน์ทั้งคอลัมน์**เว้นแต่มี `roles.manage`/`people.manage`
+
+**ตัดทิ้งเพราะไม่มีที่เก็บ**: ปุ่มอัปโหลดรูปโปรไฟล์ (ไม่มีคอลัมน์ + ไม่มี bucket — เดิมพรีวิวแล้วหายตอนบันทึก) · ชิปเลือกโซนในหน้าประวัติ (โซนอยู่ `zone_sales` คนละตาราง งานเขียนนี้ไม่แตะ → โชว์อย่างเดียว) · ช่องแก้รหัสพนักงาน
+**พลอยได้**: `/new-sales` + ตั้งค่า → ทีม รับ roster จริงเป็น prop แล้ว (เดิมอ่าน seed ก้อนเดียวกัน) · กระดานเซลใหม่ว่างโดยตั้งใจ + **บอกเหตุผลบนจอ** ว่ารอ `date_started` · ลบ `assignableAgents()`/`defaultAssignee()` ที่ตายแล้วใน `lib/leads.ts`
+
+**ทดสอบ (login Game/S-002 บน localhost)**: 10 แถวตรง DB · โซนเป็นชื่อไทย · ไม่มีคอลัมน์คอมมิชชั่น/บทบาท · ไม่มีปุ่มแก้ไข/เพิ่ม · 2 การ์ดอ่อนไหวล็อก · ค้นด้วยชื่อเล่น+รหัสได้ · รหัสมั่ว → 404 · ใบลา: โควตาโชว์ ลากิจ 8/3 เกิน 5 วัน (ตรง DB) · ยื่นใบลาจาก `/today` → แบนเนอร์ขึ้นเองไม่ต้องรีเฟรช → ยกเลิกที่ `/leave` → หายทั้งแถวและ audit · **0 console error** · คืนค่าครบ (ใบลา 20 · audit 13 · พนักงาน 10)
+
+**ค้าง**: ยังไม่ได้ทดสอบหน้า `/team` ในเบราว์เซอร์ด้วยบัญชีที่มี `people.manage` (มีรหัสแค่ของ Game) — ฝั่ง DB ทดสอบครบแล้วว่า CEO เขียนได้ / agent เขียนไม่ได้ · `TeamsManager` ยังเก็บทีมใน memory (ตาราง `teams` ว่าง รอ CEO)
+
+---
+
+## 🔖 ก่อนหน้านี้ (2026-08-13)
 
 ### ✅ เสร็จ 2026-08-13: Phase 6 — `/contacts` (3/8) **ไม่ใช้ตาราง `contacts` เลย**
 **Ben ตัดสินใจ**: ตั้งคำถามว่าตาราง `contacts` จำเป็นไหม ในเมื่อชื่อ+เบอร์เจ้าของอยู่ใน `main_2_owner` และของลูกค้าอยู่ใน `main_6_buyer_crm` อยู่แล้ว → **เลือกทางที่อ่านสดจาก 2 ตารางเดิม ไม่สร้าง/ไม่ import ตารางที่ 3**
