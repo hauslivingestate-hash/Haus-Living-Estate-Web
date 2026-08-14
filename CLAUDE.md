@@ -161,7 +161,23 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 
 ## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-13)
 
-### 🟡 กำลังทำ: Phase 6 — เชื่อมหน้าที่ยังอ่าน seed (เสร็จ 2/8: `/projects` · `/last-match`)
+### 🟡 กำลังทำ: Phase 6 — `/contacts` (ยังไม่เสร็จ — ทำ DB ไปแล้ว เหลือ import + หน้าเว็บ)
+**Ben ตัดสินใจ 2026-08-13**: *"เอาให้เห็นข้อมูล Owner เฉพาะของตัวเอง ยกเว้น Admin CEO และ Leader ของเขา"* + ยืนยันว่า **Listing Support คงสิทธิ์เห็นทั้งหมดไว้** (งาน Support คือโทรหาเจ้าของของทรัพย์ที่ตัวเอง**ไม่ได้**ดูแล — `main_4.sale_id` ไม่เคยเป็น `SP-xxx` ถ้า scope จะมองไม่เห็นเจ้าของเลยสักราย)
+
+**✅ เสร็จแล้ว (apply บน production + มิเรอร์ลง `db/rls_policies.sql` §13 และ `db/supabase_full_setup.sql`)**
+- **permission ใหม่ `contacts.view_team`** (permissions 36 → **37**) → ให้ `sales_leader` · `ceo` · `system_admin`
+- **ถอน `contacts.view_all` จาก `sales_leader`** — ของเดิมหัวหน้าทีมเห็นเจ้าของ**ทั้งบริษัท** ไม่ใช่แค่ลูกทีม
+- **policy `contacts` + `main_2_owner` เพิ่มชั้นกลาง** เป็น own → team → all (แบบเดียวกับ `main_7_last_match`)
+  - ⚠️ ต้องแก้ `main_2_owner` ด้วย ไม่งั้น `sales_leader` ที่เพิ่งเสีย `view_all` จะมองไม่เห็นเจ้าของเลย
+- **ทดสอบด้วย session จำลองแล้ว rollback**: agent (Mhow) เห็น **99** ราย (เท่าเดิม ไม่กระทบ) · listing_support (Benz) เห็น **452** ครบ · จำลอง Pup เป็น `sales_leader` คุมทีม {S-001,S-002,S-004} → เห็น **220** ราย (ของทีม ไม่ใช่ 452 และไม่ใช่แค่ของตัวเอง) · rollback แล้ว teams/leaders กลับเป็น 0
+- ⚠️ **ชั้น team ยังไม่มีผลจริงวันนี้** — `teams` ว่าง + ไม่มีใครถือ `sales_leader` → `visible_employee_codes()` คืนตัวเองคนเดียวสำหรับทุกคน (รอ CEO ตั้งหัวหน้าทีม) **แปลว่าการเปลี่ยนรอบนี้ยังไม่กระทบใครเลยในทางปฏิบัติ**
+
+**⬜ เหลือทำ**
+1. **import ยุบรวม `contacts`** — เจ้าของ 452 (มีเบอร์ 401) + ลีด 953 (มีเบอร์ 891) → **เบอร์ไม่ซ้ำ 1,169 ราย** (ซ้อนกัน 5 ราย = เป็นทั้งเจ้าของและผู้ซื้อ) · `assigned_to` ควรเป็นเซลที่ดูแล (เจ้าของ→เซลของ listing · ลีด→`sale_id`) เพราะ policy ผูกกับ `created_by`/`assigned_to`
+2. เขียน `lib/contacts.ts` + `/contacts` ให้ query จริง (ตอนนี้ยัง seed)
+3. ⚠️ **ช่องโหว่ดีไซน์ที่ต้องคิด**: `contacts` เป็นตาราง snapshot — เจ้าของ/ลีดที่สร้างใหม่**หลัง** import จะไม่โผล่เองอัตโนมัติ ต้องมี trigger หรือให้หน้าอ่านแบบ union
+
+### ✅ เสร็จ 2026-08-13: Phase 6 — `/projects` · `/last-match` (2/8)
 **เสร็จรอบนี้:**
 - **`/projects` + `/projects/[id]`** — อ่าน `main_3_property_detail` จริง **308 โครงการ** · id เปลี่ยนจาก slug เป็น `project_id` จริง (`PROJECT-006`) · แมปชื่อคอลัมน์ที่ไม่ตรงกัน (`units`←total_units · `age`←project_age · `common_area`←facilities · `resident_persona`←resident_occupation · `closing_price`←project_sold_price) · `flooding` เป็น boolean → แปลงเป็น "เคยท่วม"/"ไม่ท่วม" โดย **null ต้องยังเป็น "ไม่ระบุ"** (ไม่ใช่ "ไม่ท่วม")
 - **`/last-match`** — อ่าน `main_7_last_match` จริง 56 แถว · **ถอด client-side scoping ทิ้ง** เพราะ RLS ทำ own/team/all ให้อยู่แล้ว (ของเดิมเทียบ seed user id กับ seed employee code → session จริงไม่เคยแมตช์ จะทำให้ตารางว่าง) เหลือ `matchScope()` ไว้ตัดสินแค่ว่าจะโชว์คอลัมน์ "เซลส์" ไหม

@@ -424,6 +424,7 @@ insert into permissions (key, group_key, group_label, label, hint, sort_order) v
   ('leads.assign','leads','Lead / ดีล','มอบหมาย Lead',null,13),
   ('leads.edit','leads','Lead / ดีล','แก้ไข Lead',null,14),
   ('contacts.view_all','contacts','ผู้ติดต่อ','ดูผู้ติดต่อทั้งหมด',null,20),
+  ('contacts.view_team','contacts','ผู้ติดต่อ','ดูผู้ติดต่อของทีมตัวเอง',null,21),
   ('contacts.view_own','contacts','ผู้ติดต่อ','ดูเฉพาะที่สร้าง/ได้รับมอบหมาย',null,21),
   ('contacts.manage','contacts','ผู้ติดต่อ','จัดการผู้ติดต่อ',null,22),
   ('listings.view','inventory','คลังทรัพย์','ดูทรัพย์',null,30),
@@ -494,7 +495,8 @@ insert into role_permissions (role_id, permission_key) values
 
   ('sales_leader','leads.view_all'),('sales_leader','leads.create'),
   ('sales_leader','leads.edit'),('sales_leader','leads.assign'),
-  ('sales_leader','contacts.view_all'),('sales_leader','contacts.manage'),
+  -- ทีมของตัวเอง ไม่ใช่ทั้งบริษัท (Ben 2026-08-13) — ดู §13 ใน rls_policies.sql
+  ('sales_leader','contacts.view_team'),('sales_leader','contacts.manage'),
   ('sales_leader','listings.view'),('sales_leader','listings.create'),
   ('sales_leader','listings.edit'),('sales_leader','lastmatch.add'),
   ('sales_leader','lastmatch.view_team'),('sales_leader','activity.log'),
