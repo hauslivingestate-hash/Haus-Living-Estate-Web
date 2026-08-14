@@ -26,7 +26,7 @@
 ### งานถัดไปตามลำดับ (ดูรายละเอียดเต็มที่ 🗺️ แผนเฟส ด้านล่าง)
 1. ~~**Phase 5 (Write path)**~~ ✅ **เสร็จครบ 2026-08-13** — แก้ทรัพย์ · แก้ลีด/เปลี่ยนสเตจ · เพิ่มลีด · มอบหมายลีด · เพิ่มทรัพย์ · ติ๊กงาน `/today`
 2. **Phase 6 (กำลังทำ — 5/8)** — เหลือ **`/` แดชบอร์ด** (ต้องถาม Ben ก่อนว่าจะเปิดของเดิมหรือทำใหม่) · **`/new-sales`** (ติดที่ `date_started` ว่างทั้ง 10 คน รอ HR) · **`/website`** (เป็นฟีเจอร์ Phase 8)
-3. หน้าตั้งค่าโซนในเว็บยังเป็น 1 โซน 1 เซล ต้องแก้ให้รองรับหลายคน (DB รองรับแล้วผ่าน `zone_sales`)
+3. ~~หน้าตั้งค่าโซนยังเป็น 1 โซน 1 เซล~~ ✅ เสร็จ 2026-08-14 (`deca0f6`)
 4. ~~หน้าจัดการบัญชีสำหรับ Admin~~ ✅ เสร็จ 2026-08-08 — ดู Phase 7
 
 ### 3 เรื่องที่ต้องรู้ก่อนแตะอะไร
@@ -148,7 +148,7 @@ price_remark, unit_condition, close_type
 - ⚠️ **หน้าที่เป็น "ของส่วนตัว" ต้องกรอง `employee_code` เองในโค้ด อย่าพึ่ง RLS** — policy หลายตัวเปิดให้ `roles.manage`/`performance.view_team` ด้วย (เจอจริงตอนต่อ `/today`)
 - `TODAY` ใน `lib/momentum.ts` (`@deprecated`) ยังมี 8 ไฟล์อ้างอยู่ — ลบได้เมื่อหน้า leave/new-sales/notifications/probation ต่อ DB เสร็จ
 - ~~`/contacts` ต้อง import + dedupe~~ ✅ **ไม่ import แล้ว** — อ่านสดจาก `main_2_owner` + `main_6_buyer_crm` (Ben ตัดสินใจ 2026-08-13 ดูด้านบน)
-- `lib/zones.ts` + `ZonesAdmin` ยังเป็น 1 โซน 1 เซล ต้องแก้ให้ตรง `zone_sales` (many-to-many + `is_primary`)
+- ~~`lib/zones.ts` + `ZonesAdmin` ยังเป็น 1 โซน 1 เซล~~ ✅ เสร็จ 2026-08-14
 
 ### เฟส 7 — แอดมิน/ops 🟡
 - [x] **หน้าจัดการบัญชี** (สร้าง/รีเซ็ตรหัสให้คนอื่น) — เสร็จ 2026-08-08 ที่ `/settings` → "บัญชีผู้ใช้" ([AccountsManager](haus-crm/components/AccountsManager.tsx) + [lib/mutations/accounts.ts](haus-crm/lib/mutations/accounts.ts) + [lib/supabase/admin.ts](haus-crm/lib/supabase/admin.ts)) gate ด้วย permission ใหม่ `people.manage_accounts` (**CEO / HR / system_admin เท่านั้น** — Ben ตัดสินใจเจาะจงว่าไม่ใช่ `admin` business role และไม่ใช่ `people.manage` เดิมที่กว้างกว่า) — ทดสอบจริงผ่าน `browser-automation` แล้ว: สร้างบัญชีให้ Pai + รีเซ็ตรหัส Mhow ผ่านหน้านี้ ยืนยัน login ได้จริง แล้วลบ/คืนค่าทดสอบทั้งหมด (ลบ auth user ของ Pai ผ่าน Admin REST ตรง คืนอีเมลเดิมจากไฟล์ import, รีเซ็ตรหัส Mhow กลับเป็นของเดิม) — ✅ **ตั้ง `SUPABASE_SERVICE_ROLE_KEY` ใน Vercel + redeploy แล้ว 2026-08-10 · ใช้งานได้จริงบน production แล้ว** (ดูวิธียืนยันใต้หัวข้อวันที่ 2026-08-10)
@@ -163,8 +163,20 @@ checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโ�
 
 ## 🔖 ค้างอยู่ตรงนี้ — อ่านก่อนทำต่อ (2026-08-14)
 
-### ✅ เสร็จ 2026-08-14: Phase 6 — `/leave` · `/team` (5/8 แล้ว) + ปิดช่องโหว่ RLS 1 จุด
-**commit**: `98f9145` (/leave) · `71033ea` (/team) — push แล้วทั้งคู่
+### ✅ เสร็จ 2026-08-14: Phase 6 — `/leave` · `/team` · ตั้งค่า→โซน + ปิดช่องโหว่ RLS 1 จุด
+**commit**: `98f9145` (/leave) · `71033ea` (/team) · `deca0f6` (โซน) — push แล้วทั้งหมด
+
+#### ✍️ Ben สั่ง 2026-08-14: `date_started` = **1/11/2025 ทุกคน**
+เขียนลง `main_1_hr` แล้วครบ 10 คน (รวม Pai ที่ลาออก + E-001 ที่เป็นแถวแอดมินปลอม) → ปลดล็อกโควตาลาปีแรก · **แต่ `/new-sales` ยังทำต่อไม่ได้** เพราะ ladder ต้องมี 2 อย่างที่ยังไม่มี: (1) **ตาราง `probation_rank`/`rank_criterion`** — ตอนนี้ ladder อยู่ใน `ProbationProvider` แบบ in-memory รีเฟรชแล้วหาย (เป็นงาน Phase 8 มีเอกสาร `PROBATION_FEATURE.md`) (2) **นิยามว่า "เซลใหม่" คือกี่เดือน** — ทุกคนเริ่มวันเดียวกัน = อยู่มา ~9.5 เดือนเท่ากันหมด ต้องให้ Ben บอกช่วงโปรเบชั่นก่อน ไม่งั้นกระดานจะขึ้นทั้ง 6 คนหรือ 0 คน
+
+#### ตั้งค่า → โซน (`deca0f6`)
+🐛 **บั๊กสดที่เจอ: `lib/zones.ts` (sample 12 โซน) ยังป้อน dropdown โซนใน `ListingEditSheet` อยู่ และ 4 รหัสในนั้น (`PTM` `PT3` `BKL` `BWK`) ไม่มีใน `zone` เลย → เลือกแล้ว save ชน FK ทันที** · อีก 22 โซนจริงก็ไม่มีให้เลือก — เปลี่ยนไปอ่านจาก DB ผ่าน `MasterDataProvider` (31 ตัวเลือก = 30 โซน + ไม่ระบุ)
+- `ZonesAdmin` เดิมโชว์ "เซลส์ที่ดูแล" **คนเดียว** จากคอลัมน์ `zone.sale_id_assigned` ที่**ถูกลบไปตั้งแต่ 2026-08-03** + ปุ่มแก้ไข disabled → เขียนใหม่เป็นตัวแก้จริง เลือกเซลได้หลายคน + ตั้งเจ้าภาพ + เพิ่ม/แก้ชื่อ/ลบโซน
+- ⚠️ **`setZoneSales` ต้องเขียนทับทั้งชุดเสมอ** — `is_primary` มี partial unique index (`uq_zone_primary`) ถ้าย้ายเจ้าภาพแบบ insert ก่อน delete จะชน 23505 (ทดสอบแล้วชนจริง)
+- ⚠️ **`zone_id` ห้ามแก้** — ฝังอยู่ในรหัสทรัพย์แบบไม่มีตัวคั่น (`CASK020` = C+ASK+020) · รหัสใหม่ต้องเช็ค **prefix collision** ไม่ใช่แค่ซ้ำ (`RM` คู่กับ `RM2` ทำให้ `CRM2001` อ่านได้ 2 แบบ) — 30 โซนปัจจุบันสะอาด
+- ลบโซนที่มีทรัพย์ไม่ได้ + บอกจำนวน (PHU มี 85)
+- **ทดสอบ**: CEO แก้/มอบหมายได้ · agent เขียน 0 แถวทั้ง 2 ตาราง · ย้ายเจ้าภาพผ่าน · เจ้าภาพซ้ำถูกปฏิเสธ 23505 · เบราว์เซอร์ (Game): dropdown ถูก 31 ตัว ไม่มี ghost 4 ตัว · `/settings` ไม่โชว์ส่วนโซนเลย · DB เท่าเดิม 30/30
+- ⚠️ **ยังไม่ได้ขับ UI ตัวแก้โซนในเบราว์เซอร์จริง** — มีแต่รหัสของ agent ส่วนนี้ gate ด้วย `masterdata.govern`
 
 #### `/leave` (ใบลา 20 · โควตา 6)
 ไฟล์ใหม่ [lib/mutations/leave.ts](haus-crm/lib/mutations/leave.ts) (`submitLeave`/`decideLeave`/`withdrawLeave`/`setLeaveAllowance`) · `getLeaveRequests()`/`getLeaveAllowances()` ใน [lib/queries.ts](haus-crm/lib/queries.ts) · `LeaveProvider` เลิกถือความจริงเอง รับจาก layout · **`RbacProvider` เพิ่ม `employeeCode`** (ของเดิม client เทียบ seed id `u_game` กับ employee_code จึงไม่เคยตรง = "ใบลาของฉัน" ว่างตลอดสำหรับ user จริง)
