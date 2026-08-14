@@ -278,12 +278,10 @@ create policy p_delete on public.main_7_last_match for delete to authenticated
 -- ============================================================
 -- 6) ผู้ติดต่อ
 -- ============================================================
--- own → team → all (Ben, 2026-08-13). The middle tier was added later; see §13.
+-- own → all. A team tier was added and reverted on 2026-08-13: Ben's call is that a team
+-- lead sees every owner, which leaves nobody in a middle tier.
 create policy p_select on public.contacts for select to authenticated
   using ((select has_perm('contacts.view_all'))
-         or ((select has_perm('contacts.view_team'))
-             and (created_by in (select visible_employee_codes())
-                  or assigned_to in (select visible_employee_codes())))
          or ((select has_perm('contacts.view_own'))
              and (created_by = (select current_employee_code())
                   or assigned_to = (select current_employee_code()))));
@@ -292,9 +290,6 @@ create policy p_insert on public.contacts for insert to authenticated
 create policy p_update on public.contacts for update to authenticated
   using      (((select has_perm('contacts.manage')) or (select has_perm('roles.manage')))
               and ((select has_perm('contacts.view_all'))
-                   or ((select has_perm('contacts.view_team'))
-                       and (created_by in (select visible_employee_codes())
-                            or assigned_to in (select visible_employee_codes())))
                    or created_by = (select current_employee_code())
                    or assigned_to = (select current_employee_code())))
   with check ((select has_perm('contacts.manage')) or (select has_perm('roles.manage')));
@@ -459,13 +454,6 @@ create policy p_select on public.main_2_owner for select to authenticated
       where l.owner_id = main_2_owner.owner_id
         and coalesce(l.sale_id, zone_primary_sale(l.zone)) = (select current_employee_code())
     )
-    -- team tier added 2026-08-13 (§13) — a leader sees the owners behind their team's listings
-    or ((select has_perm('contacts.view_team'))
-        and exists (
-          select 1 from public.main_4_listing_database l
-          where l.owner_id = main_2_owner.owner_id
-            and coalesce(l.sale_id, zone_primary_sale(l.zone)) in (select visible_employee_codes())
-        ))
   );
 create index if not exists idx_main_4_owner_id on public.main_4_listing_database (owner_id);
 create index if not exists idx_main_4_sale_id  on public.main_4_listing_database (sale_id);
@@ -628,24 +616,11 @@ end
 $do$;
 
 -- ============================================================
--- 13) เพิ่มเติม 2026-08-13 (Phase 6 — /contacts) — เจ้าของทรัพย์เห็น own → team → all
---     Ben: "เอาให้เห็นข้อมูล Owner เฉพาะของตัวเอง ยกเว้น Admin CEO และ Leader ของเขา"
---     ของเดิมมีแค่ 2 ชั้น (own / all) และ sales_leader อยู่ในชั้น all → หัวหน้าทีมเห็นเจ้าของ
---     ทั้งบริษัท ไม่ใช่แค่ของลูกทีมตัวเอง จึงเพิ่มชั้นกลางแบบเดียวกับ main_7_last_match
---     ⚠️ Listing Support ยังอยู่ชั้น all ตามที่ Ben ยืนยัน — งาน Support คือโทรหาเจ้าของของ
---        ทรัพย์ที่ตัวเองไม่ได้ดูแล (main_4.sale_id ไม่เคยเป็น SP-xxx) ถ้า scope จะมองไม่เห็นเลย
---     ⚠️ ชั้น team ยังไม่มีผลจนกว่า CEO จะตั้งหัวหน้าทีม — teams ว่าง + ไม่มีใครถือ
---        sales_leader → visible_employee_codes() คืนตัวเองคนเดียวสำหรับทุกคน
+-- 13) 2026-08-13 — ขอบเขตการเห็นเจ้าของทรัพย์: ยืนยันว่าเป็น own → all (ไม่มีชั้นทีม)
+--     วันนั้นเคยเพิ่ม permission `contacts.view_team` + ชั้นกลางใน policy ของ contacts และ
+--     main_2_owner แล้ว **ถอนกลับทั้งหมดในวันเดียวกัน** เพราะ Ben สรุปว่า "หัวหน้าทีมให้เห็น
+--     ทั้งหมด" → ไม่มีใครเหลืออยู่ในชั้นกลาง เก็บ key ที่ไม่มีคนถือไว้ก็รกเปล่า ๆ
+--     สรุปกติกาที่ใช้จริง: เซล = เฉพาะเจ้าของทรัพย์ที่ตัวเองดูแล ·
+--     Admin / CEO / หัวหน้าทีม / Listing Support = เห็นทั้งหมด · Marketing = ไม่เห็นเลย
+--     (ทั้งหมดนี้คือสิ่งที่ §6 กับ §11 ด้านบนเขียนไว้อยู่แล้ว — ไม่ต้องรันอะไรเพิ่ม)
 -- ============================================================
-insert into public.permissions (key, group_key, group_label, label, sort_order)
-values ('contacts.view_team','contacts','ผู้ติดต่อ','ดูผู้ติดต่อของทีมตัวเอง',21)
-on conflict (key) do nothing;
-
-delete from public.role_permissions
- where role_id = 'sales_leader' and permission_key = 'contacts.view_all';
-
-insert into public.role_permissions (role_id, permission_key) values
-  ('sales_leader','contacts.view_team'),
-  ('system_admin','contacts.view_team'),
-  ('ceo',         'contacts.view_team')
-on conflict do nothing;
