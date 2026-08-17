@@ -1147,6 +1147,64 @@ create index idx_leave_emp on leave_requests (employee_code);
 -- เดิมอยู่ใน React Provider แบบ in-memory (แก้แล้วรีเฟรชหาย) ย้ายเข้า DB 2026-08-14
 -- Rank เรียงตาม sort_order · ผ่าน Rank สุดท้าย = ผ่านโปรเบชั่น
 -- ============================================================
+-- ============================================================
+-- แจ้งเตือนตอนมอบหมายลีด (2026-08-17)
+-- policy INSERT ของ notifications เป็น own-row โดยตั้งใจ (กันแจ้งเตือนปลอม) → คนที่มอบลีด
+-- ให้คนอื่นเขียนแจ้งเตือนถึงคนนั้นไม่ได้ ซึ่งเป็นจุดประสงค์ทั้งหมดของมัน
+-- เลือก trigger แทน RPC เพราะลีดเข้าทาง n8n เป็นหลัก (952/953 มี sale_id มาแต่ต้นทาง)
+-- RPC จะครอบเฉพาะตอนคนกดปุ่มในเว็บ → เงียบตอนที่ควรดังที่สุด
+--
+-- ⚠️ IMPORT ลีดเป็นก้อนเมื่อไหร่ ให้ปิด trigger ก่อน ไม่งั้นยิงแจ้งเตือนพันกว่าใบ:
+--     alter table main_6_buyer_crm disable trigger trg_notify_lead_assigned;
+-- ============================================================
+create or replace function notify_lead_assigned()
+returns trigger
+language plpgsql
+-- ต้องเป็น security definer เพราะเขียนแถวที่ "ผู้รับ != คนที่ทำ" ซึ่ง RLS ปฏิเสธโดยตั้งใจ
+security definer
+set search_path = public
+as $$
+declare
+  actor_code text; actor_name text; lead_label text;
+begin
+  -- WHEN ของ trigger อ้าง OLD ไม่ได้ตอน INSERT จึงเช็คตรงนี้: แตะ sale_id แต่ค่าเท่าเดิม = ไม่ได้ย้ายมือ
+  if tg_op = 'UPDATE' and new.sale_id is not distinct from old.sale_id then
+    return new;
+  end if;
+
+  -- ไม่เตือนตัวเอง
+  actor_code := current_employee_code();
+  if new.sale_id = actor_code then return new; end if;
+
+  -- ผู้รับต้องยัง Active (FK ไม่ได้เช็คสถานะให้)
+  if not exists (
+    select 1 from main_1_hr
+    where employee_code = new.sale_id and coalesce(status,'') ilike 'active%'
+  ) then return new; end if;
+
+  select nickname into actor_name from main_1_hr where employee_code = actor_code;
+  lead_label := coalesce(nullif(trim(new.lead_name), ''), new.lead_id);
+
+  insert into notifications(employee_code, type, title, body, entity, entity_id, actor)
+  values (
+    new.sale_id, 'lead_assigned',
+    'ได้รับ Lead ใหม่: ' || lead_label,
+    case when new.phone is not null then 'เบอร์ ' || new.phone else null end,
+    'lead', new.lead_id,
+    coalesce(actor_name, 'ระบบ')  -- null = มาจาก n8n / service role
+  );
+  return new;
+end;
+$$;
+revoke execute on function notify_lead_assigned() from public, anon;
+
+drop trigger if exists trg_notify_lead_assigned on main_6_buyer_crm;
+create trigger trg_notify_lead_assigned
+after insert or update of sale_id on main_6_buyer_crm
+for each row
+when (new.sale_id is not null)
+execute function notify_lead_assigned();
+
 create table probation_rank (
   id          text primary key,
   name        text not null,
