@@ -19,7 +19,7 @@
 | ข้อมูล | ✅ import จากชีทครบ — ทรัพย์ **511** · ลีด **953** · โครงการ **308** · เจ้าของ **452** · กิจกรรม **2,334** · Last Match **56** · พนักงาน **10** · โซน **30** |
 | Login | ✅ ใช้งานจริง — **9 บัญชี** (พนักงาน 8 + Admin) · บังคับ login แล้ว · มีหน้าเปลี่ยนรหัส `/account` · **CEO/HR สร้าง/รีเซ็ตรหัสให้คนอื่นได้แล้วที่ ตั้งค่า → บัญชีผู้ใช้** |
 | สิทธิ์ | ✅ RBAC อยู่ใน DB — **36 สิทธิ์** · 8 บทบาท · ผูกกับพนักงานจริงแล้ว |
-| DB | ✅ **56 ตาราง** (+`lead_purpose`/`sell_reason` 2026-08-10) · เงินเดือน/PII ล็อกแล้ว · +3 function (`create_owner` Phase 5 ข้อ 1 · `create_lead` ข้อ 3 · `resolve_employee_code` ข้อ 4) |
+| DB | ✅ **~64 ตาราง · 5 view · 16 function** — ดูรายการเต็มใต้ 📋 คลังตารางปัจจุบัน · เงินเดือน/PII ล็อกแล้ว · ⚠️ **`db/supabase_full_setup.sql` ตกยุค ขาด 5 ตาราง** (ดูหัวข้อเดียวกัน) |
 | ความปลอดภัย | ✅ **RLS Phase 4 ปิดครบแล้ว** — `demo_read_all` + anon ถูกถอนหมด (ดูรายละเอียดใต้ Phase 4) |
 | ✅ การบันทึก | ✅ **Phase 5 ปิดครบ 6/6 แล้ว 2026-08-13** — ทุกปุ่ม save เขียน DB จริง · +ใบลา/ประวัติพนักงาน (2026-08-14) |
 
@@ -143,10 +143,12 @@ price_remark, unit_condition, close_type
 เหลือ 2 หน้า: `/` แดชบอร์ด · `/website` (~~`/today`~~ ✅ พร้อม Phase 5 ข้อ 6 · ~~`/projects`~~ ~~`/last-match`~~ ~~`/contacts`~~ ✅ 08-13 · ~~`/leave`~~ ~~`/team`~~ ✅ 08-14) — ใช้ [lib/plan.ts](haus-crm/lib/plan.ts) หรือ [lib/queries.ts](haus-crm/lib/queries.ts) เป็นแม่แบบได้
 - ⚠️ **RLS หลายตารางเป็น own-row → คอลัมน์ที่โชว์ค่าของ "คนอื่น" จะโกหกเงียบ ๆ** เจอมาแล้ว 3 ตาราง: `activities` · `user_roles` · `tasks`/`targets` — **แยกให้ออกระหว่าง "0" กับ "คุณไม่มีสิทธิ์เห็น"** ถ้าเห็นไม่ได้ให้เป็น `null` → "—" หรือซ่อนทั้งคอลัมน์ อย่าปล่อยเป็น 0/ว่าง
 - **`/` แดชบอร์ด — Ben สั่งพักไว้ก่อน (2026-08-14)** [app/(app)/page.tsx](haus-crm/app/(app)/page.tsx) เป็นหน้า "เร็วๆ นี้" · `components/dashboard/*` + `lib/dashboard.ts` ยังอยู่ครบ
-  - 🔴 **ตัวขวางจริงคือ ไม่มีตัวเลขรายได้ในระบบเลย** — `main_7_last_match.last_match_price` **ว่าง 0 จาก 56 แถว** · แดชบอร์ดตัวนี้พอร์ตมาจาก HAUS V2 โดยมี "รายได้" เป็นแกนกลาง ถ้าเปิดตอนนี้ **5 จาก 6 บล็อกในหน้าภาพรวมเป็น ฿0**
+  - 🔴 **ตัวขวางจริงคือ ไม่มีตัวเลขรายได้ใน Supabase เลย** — `main_7_last_match.last_match_price` **ว่าง 0 จาก 56 แถว** · แดชบอร์ดตัวนี้พอร์ตมาจาก HAUS V2 โดยมี "รายได้" เป็นแกนกลาง ถ้าเปิดตอนนี้ **5 จาก 6 บล็อกในหน้าภาพรวมเป็น ฿0**
+  - ✅ **อัปเดต 2026-08-24: ตัวเลขมีอยู่แล้วในชีท** (`_raw_close_case` → `summary_revenue`) แค่ไม่เคยถูก import → **ไม่ต้องกรอกมือ 56 ดีล** ดูรายละเอียด + คำเตือนเรื่อง "รายได้ = คอมมิชชั่น ไม่ใช่ราคาบ้าน" ที่หัวข้อ 🔖 อ่านก่อน (2026-08-24) ด้านบน
   - เป้าทีม (`teams.revenue_goal`) กับเป้า KPI (`targets`) ก็ว่างทั้งคู่
   - **สิ่งที่มีครบพอจะทำแดชบอร์ดได้ทันที**: กิจกรรม 2,334 แถว (10 เดือน) · ลีดใหม่รายเดือน 953/953 · ไปป์ไลน์ 835 (Call 521 → Show 149 → Win 21) · ทรัพย์ + ราคาประกาศ 491/511 · จำนวนดีลปิด 50
   - **3 ทางที่กางให้ Ben ดูแล้ว**: (ก) ทำใหม่ให้แกนเป็นกิจกรรม/ไปป์ไลน์แทนรายได้ (ข) กรอกราคาปิด 56 ดีลก่อนแล้วเปิดของเดิม (ค) เปิดของเดิมเลยแล้วยอมให้ว่าง — **Ben เลือกพักไว้ก่อน**
+  - 🆕 **ทางที่ 4 (เพิ่ง 2026-08-24)**: import จากชีทที่แดชบอร์ดตัวจริงใช้อยู่ แล้วทำ view ตาม `summary_*` ทั้ง 12 ตัว — **ยังไม่ได้ตัดสิน ต้องถาม Ben ว่าจะให้ haus-crm แทนที่ตัวเดิม หรือให้ 2 ตัวอยู่คู่กัน**
   - ⚠️ ไม่ว่าจะเลือกทางไหน `activities` เป็น own-row → **แดชบอร์ด "ทีม" จะเห็นแค่ของตัวเอง** ต้องทำ view `security definer` เพิ่ม
 - ~~**`/new-sales` ติดที่ `date_started`**~~ ✅ เสร็จ 2026-08-14
 - **ตารางปลายทางมีครบแล้วทุกตัว** (สร้างไว้ 2026-08-03) เหลือแค่เปลี่ยน `lib/*.ts` ให้ query จริงผ่าน `lib/supabase/server.ts`
@@ -163,6 +165,73 @@ price_remark, unit_condition, close_type
 
 ### เฟส 8 — ฟีเจอร์แยก (มีเอกสารของตัวเองใน `haus-crm/*_FEATURE.md`) ⬜
 checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโฆษณา · ladder เซลใหม่ (probation) · เว็บพอร์ทัลลูกค้า
+
+---
+
+## 🔖 อ่านก่อน (2026-08-24) — แดชบอร์ดของ Ben · คลังตาราง · ของที่ค้าง
+
+> เซสชันนี้ **ไม่ได้แก้โค้ดเลย** เป็นการสำรวจล้วน · ตัวเลขแถวเป็นค่าที่วัดไว้ล่าสุด ไม่ได้ยิงสด
+> เพราะ **Supabase MCP หลุด ต้อง authorize ใหม่ที่ `/mcp`** (โหมด non-interactive รันเองไม่ได้)
+
+### 🔴 ค้นพบใหญ่: "ตัวเลขรายได้" มีอยู่จริง — แต่อยู่ในชีท ไม่ใช่ Supabase
+Ben ส่งลิงก์แดชบอร์ดที่ใช้งานจริงมาให้ดู: **https://haus-dashboard-benhoenigs-projects.vercel.app**
+
+**เป็นคนละแอปกับ `haus-crm`** (คนละโปรเจกต์ Vercel) และ **อ่าน Google Sheets ผ่าน `/api/sheets?sheet=...`**
+12 ชีท: `summary_overview` · `summary_overview_monthly` · `summary_revenue` · `summary_revenue_monthly` ·
+`summary_activity` · `summary_activity_monthly` · `summary_listings` · `summary_listings_monthly` ·
+`summary_kpi` · `summary_heatmap_daily` · `summary_targets` · `summary_lead_sources` (+ `/api/settings`)
+
+→ **ตรงกับคอมเมนต์ "wiring map" ใน [lib/dashboard.ts](haus-crm/lib/dashboard.ts) เป๊ะ** — ของเราถูกออกแบบให้เป็นตัวเดียวกัน แค่เปลี่ยนต้นทางจากชีทเป็น Supabase view
+
+**ตัวเลขจริงที่แดชบอร์ดนั้นโชว์ (ส.ค. 2026):** ทีม **฿478,800 · 4 ยูนิต** · Mhow ฿283,800 (2 ดีล) · Stone ฿97,500 · Q ฿97,500 · Pup/Game/Golf ฿0 · Mhow ปีนี้ ฿777,450 / 7 ดีล · **เป้าทีม ฿3,000,000/เดือน**
+
+- 🔴 **ต้นทางคือชีท `_raw_close_case`** (คอลัมน์ วันที่ปิด · Status `Pending`/`Success` · วันที่โอน) — **ตอน import 2026-08-03 ชีทนี้ไม่ได้ถูกดึงเข้ามาเลย** เข้ามาแค่ `main_7_last_match` 56 แถวที่ไม่มีราคา
+- ⚠️ **"รายได้" ในแดชบอร์ดนั้นคือ "คอมมิชชั่น" ไม่ใช่ราคาบ้าน** — ฿283,800 ต่อ 2 ยูนิต = เฉลี่ย ฿119,700/ยูนิต
+  → **ห้ามแมปเข้า `main_7_last_match.last_match_price` โดยไม่ถามก่อน** (ช่องนั้นทำไว้ 2026-08-17 สำหรับ "ราคาปิดดีล") · ตัวที่น่าจะตรงกว่าคือ `main_6_buyer_crm.commission` — **ยังไม่ได้ยืนยันกับ Ben**
+- ✅ **แก้ความเข้าใจเดิม**: ที่เคยเขียนว่า "ไม่มีตัวเลขรายได้ในระบบเลย ต้องกรอก 56 ดีลเอง" — **จริงเฉพาะฝั่ง Supabase** ข้อมูลมีอยู่แล้วในชีท เลือก import ได้แทนการกรอกมือ
+
+### เทียบ: แดชบอร์ดของ Ben (ใช้จริง) vs ของใน haus-crm (พักไว้)
+| | Ben (live, ข้อมูลจริง) | haus-crm (`components/dashboard/*`) |
+|---|---|---|
+| การ์ดยินดี | **7 ใบ** (นักขาย · ปิดดีล · เป้าแน่น · ขยัน · สม่ำเสมอ · มาแรง · นักล่าทรัพย์) | 1 ใบ |
+| KPI | **6 ตัว** — Owner Talk · Update Price · New List · Sourcing · Survey · Buyer Follow + จังหวะสัปดาห์ 1–4 | 4 ตัว (ขาด Update Price · New List) |
+| ช่วงเดือน | ม.ค. 2025 – ส.ค. 2026 (20 เดือน) + preset "ปีก่อน" | ม.ค.–ก.ค. 2026 **ฮาร์ดโค้ด** |
+| นาฬิกา | จริง (ส.ค. 2026 · วันที่ 24/31) | ตรึงไว้ `DASH_MONTH="2026-07"` `DASH_DAY=18` |
+| เป้าทีม | **฿3,000,000/เดือน** | `TEAM_GOAL_MONTHLY = 12,000,000` ❌ ผิด 4 เท่า |
+| Division | `div=sales` (จริง) + `div=marketing` (**ติดป้าย `[ MOCK ]` บนจอ**) | ไม่มี |
+| ปุ่ม | ตั้งเป้า KPI · ตั้งค่า · ดูรางวัล 1/2/3 | ไม่มี |
+
+- แท็บรายคน **6 คน** (Q/Stone/Pup/Game/Golf/Mhow) ใช้ได้จริงทุกคน — 10 บล็อก: ฝั่งผู้ซื้อ · ฝั่งเจ้าของ · KPI · กิจกรรมแยก 3 กลุ่ม · heatmap รายวัน
+- `div=support` / `listing` / `all` / `admin` **ไม่มีจริง** เด้งไปหน้า marketing หมด → มีแค่ 2 division
+- ทุกหน้า 0 console error · หน้าเว็บบอกเอง "อัปเดตทุก 5 นาที"
+
+**❓ ยังไม่ได้ตัดสิน — ต้องถาม Ben ก่อนเริ่ม**: จะให้แดชบอร์ดใน `haus-crm` มาแทนตัวนี้ (ต้อง import `_raw_close_case` + ทำ view ให้ครบ 12 ชีท) หรือปล่อยให้ 2 ตัวทำงานคู่กันโดยตัวนั้นอ่านชีทเหมือนเดิม
+
+### 📋 คลังตารางปัจจุบัน (~64 ตาราง · 5 view · 16 function)
+| กลุ่ม | ตาราง | แถวล่าสุด |
+|---|---|---|
+| **หลัก (11)** | `main_1_hr` · `main_2_owner` · `main_3_property_detail` · `main_4_listing_database` · `main_5_lead_database` · `main_6_buyer_crm` · `main_7_last_match` · `main_8_listing_photo` · `main_9_support_log` · `main_10_potential_listing` · `main_11_potential_listing_log` | 10 · 452 · 308 · **511** · **0 ⚠️** · **953** · 56 · 0 · ~511 · 210 · 210 |
+| **Lookup (26)** | gender · nationality · potential · lead_status · pipeline_stage · bank_loan · lead_type · lead_purpose · sell_reason · complain_status · marketing_channel · contact_by · employee_status · job_position · second_position · listing_status · listing_potential · listing_type · property_type · in_out_project · direction · view_type · unit_position · price_remark · unit_condition · close_type | — |
+| **สิทธิ์/คน (6)** | `permissions` · `roles` · `role_permissions` · `user_roles` · `teams` · `zone`+`zone_sales` | 36 · 8 · 141 · 10 · **0 (รอ CEO)** · 30/30 |
+| **งาน/กิจกรรม (5)** | `activities` · `action_type` · `tasks` · `targets` · `user_quick_actions` | **2,334** · 23 · 0 · 0 · 0 |
+| **วันลา (3)** | `leave_type` · `leave_allowances` · `leave_requests` | — · 6 · 20 |
+| **โปรเบชั่น (2)** | `probation_rank` · `rank_criterion` | ladder เดิม |
+| **เทมเพลต (5)** | `kpi_template` · `listing_copy_template` · `checklist_template` · `checklist_template_item` · `listing_checklist_item` | 6 · **0 = ใช้ค่าตั้งต้น** · 3 · 14 · 0 |
+| **ระบบ (3)** | `audit_log` · `notifications` · `notification_cron_state` | 13 · 0 · 1 |
+| **ตายแล้ว (2)** | `contacts` · `contact_roles` | **0 — ไม่มีใครใช้** |
+
+**View (5)**: `v_main_listing` · `v_support_listing` · `v_sale_status` · `v_sale_zones` · `v_employee_private`
+
+### ⚠️ 3 เรื่องที่ต้องรู้จากการนับ
+1. 🔴 **`db/supabase_full_setup.sql` ตกยุคแล้ว** — มี 59 ตาราง **ขาด 5 ตัวที่แอปเรียกใช้จริง**: `kpi_template` · `listing_copy_template` · `checklist_template` · `checklist_template_item` · `listing_checklist_item` (ทำผ่าน migration แล้วมิเรอร์ลงแค่ `rls_policies.sql` เป็นคอมเมนต์) · **ถ้ามีคน setup project ใหม่ด้วยไฟล์นี้ หน้าตั้งค่า 3 หน้ากับหน้าทรัพย์จะพังทันที** — เสนอ Ben ให้เติมแล้ว ยังไม่ได้ทำ
+2. **`main_5_lead_database` ยังว่าง 0 แถว** — import 2026-08-03 ลงแต่ `main_6` (trigger นับเลขจาก 2 ตารางแล้ว แต่ตัวตารางยังว่าง)
+3. **ไม่มีตารางไหนเก็บ "รายได้" เลย** — ตรงกับข้อค้นพบเรื่องชีทด้านบน
+
+### ❓ Ben ถาม: "KPI ดูที่ไหน" — ตอบแล้ว พร้อมช่องว่าง 2 ข้อ
+- **แก้แบบ KPI** → `/settings` → **เป้าหมาย KPI** (เห็นเฉพาะ `masterdata.govern` = CEO/Admin) · 6 แบบ: โทรหาลูกค้า 30 · พาชม 10 · เยี่ยมเจ้าของ 12 · ถ่าย Reels 6 · ปิดการขาย 3 · คอมมิชชั่น 500,000
+- **ดูเป้าจริง** → `/today` การ์ด "เป้าหมายเดือนนี้" (ทางการ / ส่วนตัว)
+- 🐛 **ช่องว่าง 1: `kpi_template` ยังไม่มีใครอ่านนอกจากหน้าตั้งค่า** — ฟอร์มตั้งเป้าใน `/today` ยังให้พิมพ์เองทุกครั้ง ไม่ได้เอา 6 แบบมาเป็นตัวเลือก (**งานเล็ก ยังไม่ได้ทำ**)
+- **ช่องว่าง 2**: ตั้งเป้าให้ลูกทีมไม่ได้ เพราะ `teams` ว่าง → "ทางการ (ตั้งโดยหัวหน้า)" จะว่างเสมอ
 
 ---
 
