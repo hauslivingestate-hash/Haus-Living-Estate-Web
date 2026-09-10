@@ -14,6 +14,9 @@
 
 **ระบบขึ้นของจริงแล้ว** ไม่ใช่เดโมอีกต่อไป — ข้อมูลจริงเข้าครบ + ต้อง login ถึงใช้ได้ + RLS ปิดครบแล้ว + **มี write path จุดแรกแล้ว** + **มีหน้าจัดการบัญชีผู้ใช้แล้ว**
 
+> 🔴 **2026-09-10: กำลังย้าย Supabase ไปโปรเจกต์ใหม่ (ซิดนีย์ → สิงคโปร์) — ซ้อมผ่านแล้ว แต่ยังไม่ได้สลับ (Ben: ยังสลับไม่ได้ จะมีคนมาต่องาน)**
+> แอปยังใช้โปรเจกต์เก่า `jpufhxzvqfrdcblfmrmu` อยู่ · **ก่อนแตะ DB ให้อ่านหัวข้อ 🔖 (2026-09-10) ด้านล่างก่อน** — ถ้ามีคน apply migration ลงโปรเจกต์เก่าหลังสลับ งานนั้นจะหายไปกับฐานที่ไม่มีใครอ่าน
+
 | ด้าน | สถานะ |
 |---|---|
 | ข้อมูล | ✅ import จากชีทครบ + อัปเดตเพิ่ม 2026-08-26 — ทรัพย์ **544** · ลีด **1,062** · โครงการ **323** · เจ้าของ **481** · กิจกรรม **2,646** · Last Match **56** · พนักงาน **10** · โซน **30** |
@@ -49,6 +52,7 @@ Haus-Web-Wp.Ben/
 ├── db/
 │   ├── supabase_full_setup.sql   ไฟล์หลัก รันทีเดียวครบ (36 ตาราง + 4 view + 1 function)
 │   ├── rls_policies.sql          RLS ทั้งระบบ (Phase 4) — รันหลัง full_setup + หลังมีตาราง RBAC
+│   ├── migrate_project/          สคริปต์ย้าย Supabase โปรเจกต์ → โปรเจกต์ (2026-09-10) ดูหัวข้อ 🔖 2026-09-10
 │   └── samples/                  CSV ตัวอย่าง (buyer_crm, lead_database)
 ├── docs/                  เอกสาร/PDF (gitignore *.pdf)
 ├── import/                ⬅ วาง CSV ที่ export จาก Google Sheets ไว้ที่นี่ (ยังว่าง)
@@ -165,6 +169,86 @@ price_remark, unit_condition, close_type
 
 ### เฟส 8 — ฟีเจอร์แยก (มีเอกสารของตัวเองใน `haus-crm/*_FEATURE.md`) ⬜
 checklist ทรัพย์ A-List/Exclusive · เทมเพลตคำโฆษณา · ladder เซลใหม่ (probation) · เว็บพอร์ทัลลูกค้า
+
+---
+
+## 🔖 อ่านก่อน (2026-09-10) — ย้าย Supabase ไปโปรเจกต์ใหม่ · ซ้อมผ่าน · **ยังไม่สลับ**
+
+Ben ตัดสินใจสร้างโปรเจกต์ใหม่แทนการย้ายของเดิม (Supabase ย้าย region ของโปรเจกต์ที่มีอยู่ไม่ได้)
+
+| | เก่า (ยังใช้งานอยู่) | ใหม่ |
+|---|---|---|
+| project ref | `jpufhxzvqfrdcblfmrmu` | `mmsornnhtkvcjqsynxic` |
+| region | ap-southeast-2 **ซิดนีย์** | ap-southeast-1 **สิงคโปร์** |
+| URL | `https://jpufhxzvqfrdcblfmrmu.supabase.co` | `https://mmsornnhtkvcjqsynxic.supabase.co` |
+| Postgres / auth schema | 17.6 / 77 migration (`20260625000000`) | **ตรงกันเป๊ะ** → ย้ายบัญชีตรงๆ ได้ |
+
+### ของที่ต้องย้าย (สำรวจแล้ว)
+ฐานข้อมูล 20 MB (public 6 MB) · บัญชี 9 · **รูปใน Storage = 0** (มีแค่ bucket `listing-photos` + policy 4 ตัว) · pg_cron 1 งาน · event trigger `ensure_rls` 1 ตัว · **ไม่มี** Edge Function / Vault secret / Realtime table / custom role · ทุก object ใน public เป็นของ `postgres` (ไม่มีของ `supabase_admin` ติดมา)
+- **n8n ไม่ต้องแก้แล้ว** — Ben บอกจะเลิกใช้ เปลี่ยนไปใช้อย่างอื่นแทน
+- session/refresh token **ไม่ย้าย** → ทุกคนต้อง login ใหม่ แต่**รหัสผ่านเดิมใช้ได้** (hash ย้ายมาตรงตัว)
+
+### สคริปต์: [db/migrate_project/](db/migrate_project/) — รันซ้ำได้ ไม่มีรหัสผ่านในไฟล์
+```
+powershell -File db\migrate_project\full_cutover.ps1   # ย้ายทั้งหมด + เทียบ → บรรทัดท้ายต้องเป็น "NONE - identical"
+powershell -File db\migrate_project\compare.ps1        # เทียบอย่างเดียว (อ่านทั้ง 2 ฝั่ง ไม่เขียน)
+```
+| ไฟล์ | หน้าที่ |
+|---|---|
+| `env.ps1` | อ่าน `C:\Users\thinn\haus-migration.env` (**นอก repo** — `OLD_DB_URL` `NEW_DB_URL` `NEW_PUBLISHABLE_KEY` `NEW_SECRET_KEY`) · ส่งรหัสผ่านทาง `PG*` env ไม่ใช่ command line |
+| `pre.sql` / `post.sql` | ปิด/คืน default privileges รอบการ restore (ดูกับดักข้อ 1) + ถอด storage policy/event trigger ที่ขวาง `--clean` |
+| `gen_extras.sql` | สร้าง DDL ของที่อยู่นอก `public` จากโปรเจกต์เก่า: storage policy 4 · cron · event trigger |
+| `final_reset.sql` | ล้างตาราง public + `auth.users`/`identities` ในโปรเจกต์ใหม่ก่อนลงข้อมูล |
+| `fingerprint.sql` + `compare.ps1` | พิมพ์ "ข้อเท็จจริง" ~1,500 บรรทัดจากแต่ละฝั่งแล้ว diff: จำนวนแถว **+ md5 ของเนื้อหา** 70 ตาราง · hash รหัสผ่าน · สิทธิ์ระดับตาราง/คอลัมน์/function · policy · RLS · trigger · constraint · index · view · sequence · default ACL · cron · event trigger |
+| `rls_test.sql` | จำลอง login 3 persona แบบ Phase 4 (rollback ทุกบล็อก) |
+
+- เครื่องมือ `pg_dump`/`psql` 17.6 แบบ portable อยู่ที่ `%TEMP%\haus-pg17` (ไม่ได้ติดตั้ง · หายเมื่อไหร่ `env.ps1` บอกวิธีโหลดใหม่) · **เครื่องนี้ไม่มี pg_dump/psql/Docker/Supabase CLI มาก่อน**
+- dump ลง `%TEMP%\haus-migration-dump` — **นอก OneDrive โดยตั้งใจ** เพราะมีเงินเดือน + hash รหัสผ่าน · **ลบทิ้งหลังย้ายเสร็จ**
+
+### 🔴 กับดักที่เจอ (จำไว้ใช้ทุกครั้งที่ย้าย/restore Supabase)
+1. 🔴🔴 **โปรเจกต์ใหม่แจกสิทธิ์ ALL ให้ `anon`/`authenticated` อัตโนมัติทุก object ที่ `postgres` สร้างใน public** (default privileges) แต่ `pg_dump` พิมพ์เฉพาะ grant ที่ต่างจาก "เจ้าของคนเดียว" → **restore ตรงๆ = revoke ทั้งหมดของ Phase 4 หายเงียบ รวมถึง SELECT คอลัมน์เงินเดือน/PII ใน `main_1_hr`** · แก้: `pre.sql` ถอน default privileges ก่อน restore → `post.sql` คืนให้หลังลงข้อมูล (ให้ตรงกับโปรเจกต์เก่า ซึ่งยังแจกอัตโนมัติอยู่เหมือนกัน)
+2. **ต้องลงข้อมูลด้วย `session_replication_role = replica`** (ปิด trigger) — ไม่งั้นออกรหัสทรัพย์/ลีดใหม่ทับ · `trg_notify_lead_assigned` ยิงแจ้งเตือนพันใบ · support_log/A List ซ้ำ · และยังแก้ปัญหา FK วน `main_1_hr` ↔ `teams` ที่ `pg_dump --data-only` เตือนไว้ด้วย
+3. **ของนอก `public` ไม่ติดมากับ `pg_dump -n public`**: storage policy 4 ตัว · cron `daily-notifications` · event trigger `ensure_rls` (ตัวที่เปิด RLS ให้ตารางใหม่อัตโนมัติ) — และ policy/event trigger พวกนี้ **อ้าง `public.has_perm()` / `rls_auto_enable()`** จึงขวาง `pg_restore --clean` ไม่ให้ drop function → ต้องถอดก่อนแล้วสร้างใหม่ทีหลัง
+4. **ต่อได้ทาง Session pooler (port 5432) เท่านั้น** — Direct connection เป็น IPv6 ล้วน **เครื่องนี้ไม่มี IPv6** (ทดสอบแล้ว) · Transaction pooler (6543) ใช้กับ `pg_dump` ไม่ได้ · ⚠️ **รหัสผิดหลายครั้ง Supabase แบน IP** → `env.ps1` ปฏิเสธเองถ้ายังเป็น `[YOUR-PASSWORD]` (ครั้งแรก Ben วางลิงก์มาโดยยังไม่แทนรหัส)
+5. **secret key (`sb_secret_`) โดน 401 ถ้า User-Agent ดูเหมือนเบราว์เซอร์** — PowerShell ส่ง `Mozilla/...` มาเอง · ไม่ใช่ key ผิด ใส่ `-UserAgent` อื่นก็ผ่าน
+6. **ไฟล์รูปไม่ติดมากับ dump** — วันนี้ยังไม่มีรูปสักรูป · สคริปต์**หยุดเอง**ถ้าโปรเจกต์เก่ามีรูปแล้ว (ต้องก๊อปไฟล์แยกก่อน)
+7. ไฟล์ `.sql` ที่ PowerShell 5.1 เขียนมี BOM → psql อ่านบรรทัดแรกพัง · สคริปต์เขียนแบบ UTF-8 ไม่มี BOM
+
+### ผลซ้อม (2 รอบ · รอบ 2 คือ `full_cutover.ps1` ตัวจริง ใช้เวลา **~4 นาที**)
+- `compare.ps1` → **NONE - identical** ทุกหมวด (ตาราง 70 · policy 272 · สิทธิ์ 89 relation + 29 คอลัมน์ · function 24 · trigger 11 · constraint 204 · index 95 · บัญชี 9)
+- `rls_test.sql` ตรงกันทั้ง 2 ฝั่งทุกบรรทัด:
+
+| persona | ทรัพย์ | ลีด | last match | กิจกรรม | เจ้าของ | เห็นเงินเดือน | สิทธิ์ |
+|---|---|---|---|---|---|---|---|
+| E-001 (Admin) | 544 | 1,058 | 56 | 2,646 | 481 | 4 | 36 |
+| S-003 (Q, agent) | 544 | 189 (ของคนอื่น **0**) | 16 | 529 | 95 | **0** | 13 |
+| SP-002 (Pui, marketing) | 544 | 0 | 0 | 0 | 0 | 0 | 7 |
+
+  + agent แย่งลีด/ลบทรัพย์ = **0 แถว** · `authenticated` อ่าน `main_1_hr.salary` ตรง = **permission denied** · `anon` = permission denied ทุกตาราง/function
+- API จริงของโปรเจกต์ใหม่: anon ได้ 42501 · secret key เห็นทรัพย์ 544 / ลีด 1,058 · `v_main_listing` คืนชื่อไทยถูก · Auth เห็น 9 บัญชี confirm ครบ · Storage มี bucket
+- ตั้งค่า Auth ฝั่งสาธารณะ (`/auth/v1/settings`) ตรงกันทั้ง 2 ฝั่ง
+
+### 🔴 ตัวขวาง: มีคนพัฒนาบนโปรเจกต์เก่าอยู่ **ระหว่างที่ซ้อม**
+- วันเดียวกันมี migration เข้าโปรเจกต์เก่า 6 ตัว (16:03–19:00 ตัวล่าสุด **20 วินาทีก่อน**สคริปต์รัน) และหลังจากนั้นยังมีเพิ่มอีก: ตาราง `lead_stage_event` · `dash_activity_counts` · `dash_revenue_monthly` · `dash_stage_moves` · `log_lead_stage_change` + trigger · policy `targets` เปลี่ยน · `lead_status.counts_as_revenue`
+- GitHub `haus-crm` มี commit `97b8980` (2026-09-10 18:14, `benhoenig@gmail.com`) ที่**เครื่องนี้ยังไม่ได้ pull**
+- → **โปรเจกต์ใหม่ตอนนี้ตกยุคแล้ว (ตั้งใจ)** `full_cutover.ps1` สร้างใหม่จาก snapshot สดทุกครั้ง แต่ **session นั้นต้องหยุดระหว่างสลับ** และหลังสลับต้องแก้ `project_ref` ใน `.mcp.json` ของตัวเอง + authorize ใหม่ที่ `/mcp`
+
+### ✍️ Ben (2026-09-10): **"ยังสลับไม่ได้ — เดี๋ยวจะมีคนมาต่องาน"**
+คนที่มารับช่วงต่อ อ่านตรงนี้ก่อน:
+- **อย่าเพิ่งสลับเอง** จนกว่า Ben จะสั่ง + เคลียร์ได้แล้วว่าใครทำ migration บนโปรเจกต์เก่าอยู่
+- โปรเจกต์ใหม่มีข้อมูล**ซ้อมไว้แต่ตกยุค** ไม่ต้องไปแก้อะไรในนั้น — `full_cutover.ps1` ล้างแล้วสร้างใหม่ทั้งหมดอยู่แล้ว
+- **ถ้าทำต่อจากเครื่องอื่น** ต้องมี 2 อย่างที่อยู่นอก repo: ไฟล์ `C:\Users\thinn\haus-migration.env` (ขอค่าจาก Ben — มีรหัสผ่าน DB ทั้ง 2 โปรเจกต์ + key ใหม่ · ถ้า path ต่างให้แก้ใน `env.ps1`) และ `pg_dump`/`psql` 17 (`env.ps1` บอกวิธีโหลด)
+- ระหว่างนี้งานพัฒนาทุกอย่าง**ยังทำบนโปรเจกต์เก่าได้ตามปกติ** — ไม่ต้องทำซ้ำในโปรเจกต์ใหม่ เพราะตอนสลับจะดึงไปทั้งหมด
+
+### ขั้นตอนสลับจริง (~10 นาที) — **ยังไม่ได้ทำ รอ Ben สั่ง**
+1. **Ben**: ตั้ง Vercel env 3 ตัว → `NEXT_PUBLIC_SUPABASE_URL` · `NEXT_PUBLIC_SUPABASE_ANON_KEY` · `SUPABASE_SERVICE_ROLE_KEY` (ค่าอยู่ใน `haus-migration.env`) — ไม่รู้ว่าตอนนี้ตั้งไว้ไหม (Vercel MCP ไม่มีเครื่องมืออ่าน/ตั้ง env) ถ้าตั้งไว้มันจะ override ค่าสำรองในโค้ด
+2. **Ben**: บอกทีมหยุดบันทึก + session ที่ทำ migration หยุด
+3. `full_cutover.ps1` → ต้องได้ `NONE - identical` (ไม่ได้ = หยุด) → รัน `rls_test.sql` ฝั่งใหม่
+4. `git pull` ใน `haus-crm` ก่อน แล้วแก้: [haus-crm/lib/supabaseConfig.ts](haus-crm/lib/supabaseConfig.ts) (URL + publishable key สำรอง) · [haus-crm/next.config.mjs](haus-crm/next.config.mjs) (host รูป) · `haus-crm/.env.local` · [.mcp.json](.mcp.json) (`project_ref`) · (ไม่เร่ง) `import/run_import.py` → commit ด้วย `hauslivingestate@gmail.com` → push → Vercel deploy
+5. **Ben**: login เช็ค production แล้วปล่อยทีม
+
+**หลังสลับ**: ลบ `C:\Users\thinn\haus-migration.env` + `%TEMP%\haus-migration-dump` · เก็บโปรเจกต์เก่าไว้ 1–2 สัปดาห์ (cron ของเก่ายังเขียนแจ้งเตือนลงฐานเก่าต่อ ไม่มีผลอะไร หยุดทีหลังได้)
+- 💡 **แนะนำ**: ปิด "Allow new users to sign up" ในโปรเจกต์ใหม่ (Authentication → Sign In / Providers) — **ของเก่าก็เปิดอยู่** (`disable_signup=false`) ใครก็สมัครผ่าน API ได้ ไม่ได้สิทธิ์อะไร (ไม่มีแถวพนักงาน = RLS ปฏิเสธหมด) แต่ไม่มีเหตุผลต้องเปิด เพราะบัญชีสร้างจากหน้าแอดมิน (admin API ยังใช้ได้ตอนปิด)
 
 ---
 
