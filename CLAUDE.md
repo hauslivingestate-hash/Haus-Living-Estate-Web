@@ -233,6 +233,26 @@ powershell -File db\migrate_project\compare.ps1        # เทียบอย�
 - GitHub `haus-crm` มี commit `97b8980` (2026-09-10 18:14, `benhoenig@gmail.com`) ที่**เครื่องนี้ยังไม่ได้ pull**
 - → **โปรเจกต์ใหม่ตอนนี้ตกยุคแล้ว (ตั้งใจ)** `full_cutover.ps1` สร้างใหม่จาก snapshot สดทุกครั้ง แต่ **session นั้นต้องหยุดระหว่างสลับ** และหลังสลับต้องแก้ `project_ref` ใน `.mcp.json` ของตัวเอง + authorize ใหม่ที่ `/mcp`
 
+### 🔄 อัปเดต 2026-09-17: ซ้อมใหม่กับสภาพล่าสุด + สคริปต์รองรับไฟล์และประวัติ migration แล้ว
+Ben Poovaviranon พัฒนาบนฐานเก่าต่อทั้งสัปดาห์ (10→17 ก.ย. **22 commit**) — ยกเครื่องหน้าตา (ธีมส้ม/กรมท่า · โลโก้ · ⌘K) · แดชบอร์ดทีม + เป้ารายได้ · **ปิดดีล = เคส + ทะเบียนรายได้** · **ตัวอ่านลีดด้วย OpenAI ของจริง** · **เริ่ม track migration ลง git** (`haus-crm/supabase/migrations` 99 ไฟล์)
+
+| | ตอนซ้อม 09-10 | ตอนนี้ 09-17 |
+|---|---|---|
+| ตาราง · view · function | 68 · 5 · 24 | **76** · 5 · **38** |
+| policy · index · constraint | 272 · 95 · 204 | **302** · 117 · 248 |
+| migration ใน DB | 60 | **99** |
+| Storage | bucket 1 · **ไฟล์ 0** | bucket 2 (+`avatars`) · **ไฟล์ 8** (รูปโปรไฟล์ 48 KB) |
+
+**3 เรื่องที่ต้องแก้ในสคริปต์ (แก้แล้วทั้งหมด):**
+1. 🔴 **ไฟล์ใน Storage** — เดิมสคริปต์**หยุดทันที**ถ้าเจอไฟล์ เพราะ `pg_dump` ก๊อปแต่แถวไม่ก๊อปไฟล์ → เพิ่ม [copy_storage.ps1](db/migrate_project/copy_storage.ps1): สร้าง bucket ผ่าน storage API (สคริปต์เดิม**ไม่เคยสร้าง bucket เลย** ตอนซ้อมสร้างมือ) · โหลดไฟล์จาก URL สาธารณะของฝั่งเก่าแล้วอัปเข้าฝั่งใหม่ · ลบไฟล์ที่ฝั่งใหม่มีเกิน · **ไม่ก๊อปแถว `storage.objects`** ปล่อยให้ storage สร้างเอง (id/เวลาจึงเป็นของใหม่โดยตั้งใจ → `fingerprint.sql` เทียบ `bucket/ชื่อ/ขนาด` แทนทั้งแถว)
+2. 🔴 **ประวัติ migration** (`supabase_migrations.schema_migrations` 99 แถว) อยู่คนละ schema จึงไม่ติดมากับ dump — **ถ้าไม่ก๊อป `supabase db push` ครั้งถัดไปจะไล่รันซ้ำทั้ง 99 ไฟล์**
+3. 🔴 **`pg_restore --clean` ใช้ไม่ได้อีกต่อไป** — มันสั่ง `DROP POLICY IF EXISTS ... ON <ตาราง>` ให้ทุก policy ในไฟล์ dump และ `IF EXISTS` ของ policy **ไม่ครอบถึงตารางที่ปลายทางไม่เคยมี** → ตารางใหม่ตัวแรก (`team_revenue_targets`) ทำ restore ล้มทั้งก้อน · เปลี่ยนเป็น `pre.sql` ล้าง `public` ให้เกลี้ยงก่อน แล้ว restore ตรงๆ
+- ⚠️ **เครื่องมือย้ายไปอยู่ `C:\Users\thinn\pgtools\pg17`** — ของเดิมอยู่ `%TEMP%` แล้ว **Windows ล้างไฟล์ที่ไม่ได้แตะมาสัปดาห์นึงทิ้ง เหลือ 10 จาก 68 ไฟล์ `pg_restore` หายกลางคัน**
+
+**ผลซ้อมรอบ 2026-09-17 (ใช้เวลา ~4.5 นาที)**: `compare.ps1` → **NONE - identical** ทุกหมวด (76 ตาราง · 302 policy · 38 function · 117 index · 248 constraint · 37 คอลัมน์ที่คุมสิทธิ์ · **bucket 2 · ไฟล์ 8 · ประวัติ migration**) · `rls_test.sql` ตรงกับฝั่งเก่าทุกบรรทัด (Admin สิทธิ์ 38 · Q เห็นลีดตัวเอง 189 ของคนอื่น 0 · Pui 0 · แย่งลีด/ลบทรัพย์ 0 แถว · anon ถูกปฏิเสธหมด)
+
+**เพิ่มเข้ารายการตอนสลับ**: `haus-crm/scripts/import-avatars.mjs` และ **`haus-crm/.mcp.json`** (ไฟล์ใหม่ของสัปดาห์นี้ ฝัง ref เก่าไว้ทั้งคู่) → จุดที่ต้องแก้ URL กลายเป็น **6 จุด** · และมี env ตัวใหม่ **`OPENAI_API_KEY`** ที่ต้องตั้งใน Vercel ด้วย ไม่งั้นฟีเจอร์ AI อ่านข้อความจะขึ้นว่า "ยังไม่ได้ตั้งค่า AI"
+
 ### ✍️ Ben (2026-09-10): **"ยังสลับไม่ได้ — เดี๋ยวจะมีคนมาต่องาน"**
 คนที่มารับช่วงต่อ อ่านตรงนี้ก่อน:
 - **อย่าเพิ่งสลับเอง** จนกว่า Ben จะสั่ง + เคลียร์ได้แล้วว่าใครทำ migration บนโปรเจกต์เก่าอยู่
@@ -244,7 +264,7 @@ powershell -File db\migrate_project\compare.ps1        # เทียบอย�
 1. **Ben**: ตั้ง Vercel env 3 ตัว → `NEXT_PUBLIC_SUPABASE_URL` · `NEXT_PUBLIC_SUPABASE_ANON_KEY` · `SUPABASE_SERVICE_ROLE_KEY` (ค่าอยู่ใน `haus-migration.env`) — ไม่รู้ว่าตอนนี้ตั้งไว้ไหม (Vercel MCP ไม่มีเครื่องมืออ่าน/ตั้ง env) ถ้าตั้งไว้มันจะ override ค่าสำรองในโค้ด
 2. **Ben**: บอกทีมหยุดบันทึก + session ที่ทำ migration หยุด
 3. `full_cutover.ps1` → ต้องได้ `NONE - identical` (ไม่ได้ = หยุด) → รัน `rls_test.sql` ฝั่งใหม่
-4. `git pull` ใน `haus-crm` ก่อน แล้วแก้: [haus-crm/lib/supabaseConfig.ts](haus-crm/lib/supabaseConfig.ts) (URL + publishable key สำรอง) · [haus-crm/next.config.mjs](haus-crm/next.config.mjs) (host รูป) · `haus-crm/.env.local` · [.mcp.json](.mcp.json) (`project_ref`) · (ไม่เร่ง) `import/run_import.py` → commit ด้วย `hauslivingestate@gmail.com` → push → Vercel deploy
+4. `git pull` ใน `haus-crm` ก่อน แล้วแก้ **6 จุด**: [haus-crm/lib/supabaseConfig.ts](haus-crm/lib/supabaseConfig.ts) (URL + publishable key สำรอง) · [haus-crm/next.config.mjs](haus-crm/next.config.mjs) (host รูป) · `haus-crm/scripts/import-avatars.mjs` · `haus-crm/.mcp.json` · `haus-crm/.env.local` (รวม `SUPABASE_SERVICE_ROLE_KEY` ที่ยังเป็น JWT แบบเก่า) · [.mcp.json](.mcp.json) ของ repo แม่ · (ไม่เร่ง) `import/run_import.py` → commit ด้วย `hauslivingestate@gmail.com` → push → Vercel deploy
 5. **Ben**: login เช็ค production แล้วปล่อยทีม
 
 **หลังสลับ**: ลบ `C:\Users\thinn\haus-migration.env` + `%TEMP%\haus-migration-dump` · เก็บโปรเจกต์เก่าไว้ 1–2 สัปดาห์ (cron ของเก่ายังเขียนแจ้งเตือนลงฐานเก่าต่อ ไม่มีผลอะไร หยุดทีหลังได้)

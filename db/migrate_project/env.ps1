@@ -3,9 +3,12 @@
 # passwords don't need URL-encoding and don't show up in process listings).
 #
 # Kept OUTSIDE OneDrive on purpose:
-#   pg tools  -> %TEMP%\haus-pg17               (73 MB, no reason to sync)
+#   pg tools  -> C:\Users\thinn\pgtools\pg17    (73 MB, no reason to sync)
 #   dumps     -> %TEMP%\haus-migration-dump     (contain salaries + password hashes)
-$global:PGBIN = if ($env:PGBIN) { $env:PGBIN } else { Join-Path $env:TEMP "haus-pg17" }
+#
+# The tools used to live in %TEMP%, but Windows cleaned out the half of them that had not been
+# touched in a week - pg_restore vanished mid-migration - so they now sit outside temp.
+$global:PGBIN = if ($env:PGBIN) { $env:PGBIN } else { "C:\Users\thinn\pgtools\pg17" }
 $global:DUMP  = Join-Path $env:TEMP "haus-migration-dump"
 New-Item -ItemType Directory -Force $global:DUMP | Out-Null
 

@@ -15,7 +15,22 @@ drop event trigger if exists ensure_rls;
 do $$
 declare p record;
 begin
-  for p in select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname like 'listing\_photos\_%' loop
+  for p in select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects' loop
     execute format('drop policy %I on storage.objects', p.policyname);
   end loop;
+end $$;
+
+-- 3. Empty out `public` so the restore lands on bare ground.
+--    `pg_restore --clean` cannot do this job: it emits DROP POLICY ... ON <table> for every
+--    policy in the dump, and a policy's IF EXISTS does not cover a *table* that the target has
+--    never had - so the first table added since the last copy aborts the whole restore.
+do $$
+declare r record;
+begin
+  for r in select format('drop table if exists %I.%I cascade', schemaname, tablename) c from pg_tables where schemaname = 'public' loop execute r.c; end loop;
+  for r in select format('drop view if exists %I.%I cascade', schemaname, viewname) c from pg_views where schemaname = 'public' loop execute r.c; end loop;
+  for r in select format('drop materialized view if exists %I.%I cascade', schemaname, matviewname) c from pg_matviews where schemaname = 'public' loop execute r.c; end loop;
+  for r in select format('drop routine if exists %s cascade', p.oid::regprocedure) c from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' loop execute r.c; end loop;
+  for r in select format('drop sequence if exists %I.%I cascade', schemaname, sequencename) c from pg_sequences where schemaname = 'public' loop execute r.c; end loop;
+  for r in select format('drop type if exists %I.%I cascade', n.nspname, t.typname) c from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typtype in ('e', 'd') loop execute r.c; end loop;
 end $$;

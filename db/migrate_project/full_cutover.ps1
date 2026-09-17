@@ -17,12 +17,13 @@ $t0 = Get-Date
 try {
   # ---- 1. snapshot OLD
   Use-Old
-  $photos = & "$PGBIN\psql.exe" -X -A -t -c "select count(*) from storage.objects"
-  if ([int]$photos -gt 0) { throw "old project now has $photos photo(s) in Storage - pg_dump does not copy the files, copy them separately first" }
   & "$PGBIN\pg_dump.exe" -Fc -s -n public -f "$d\schema.dump";                       if ($LASTEXITCODE) { throw "schema dump" }
   # 2>$null: pg_dump warns about the main_1_hr <-> teams FK cycle; harmless under replica mode
   & "$PGBIN\pg_dump.exe" -a -n public -f "$d\data_public.sql" 2>$null;                if ($LASTEXITCODE) { throw "data dump" }
   & "$PGBIN\pg_dump.exe" -a -t auth.users -t auth.identities -f "$d\data_auth.sql";   if ($LASTEXITCODE) { throw "auth dump" }
+  # The CLI's migration history: without it `supabase db push` replays all 99 migrations.
+  & "$PGBIN\pg_dump.exe" -c --if-exists -t supabase_migrations.schema_migrations -f "$d\data_migrations.sql"
+  if ($LASTEXITCODE) { throw "migration history dump" }
   & "$PGBIN\psql.exe" -X -A -t -f "$PSScriptRoot\gen_extras.sql" -o "$d\extras.sql"; if ($LASTEXITCODE) { throw "extras gen" }
   $x = [IO.File]::ReadAllText("$d\extras.sql") -replace '\bhas_perm\(', 'public.has_perm(' -replace 'execute function rls_auto_enable\(\)', 'execute function public.rls_auto_enable()'
   [IO.File]::WriteAllText("$d\extras.sql", $x, $enc)
@@ -34,12 +35,18 @@ try {
   # ---- 2. rebuild NEW
   Use-New
   Run-Psql @('-f', "$PSScriptRoot\pre.sql")
-  & "$PGBIN\pg_restore.exe" --clean --if-exists --single-transaction --exit-on-error -L "$d\schema.filtered.list" -d $env:PGDATABASE "$d\schema.dump"
+  # no --clean: pre.sql already emptied `public` (see the note there)
+  & "$PGBIN\pg_restore.exe" --single-transaction --exit-on-error -L "$d\schema.filtered.list" -d $env:PGDATABASE "$d\schema.dump"
   if ($LASTEXITCODE) { throw "schema restore" }
   Run-Psql @('--single-transaction', '-f', "$PSScriptRoot\final_reset.sql", '-f', "$d\data_auth.sql", '-f', "$d\data_public.sql")
   Run-Psql @('-f', "$PSScriptRoot\post.sql")
   Run-Psql @('--single-transaction', '-f', "$d\extras.sql")
+  Run-Psql @('--single-transaction', '-c', 'create schema if not exists supabase_migrations', '-f', "$d\data_migrations.sql")
   "[{0:N0}s] NEW rebuilt" -f ((Get-Date) - $t0).TotalSeconds
+
+  # ---- 2b. the files themselves (pg_dump moves bucket rows, never the bytes)
+  & "$PSScriptRoot\copy_storage.ps1"
+  if ($LASTEXITCODE) { throw "storage copy" }
 } catch {
   "FAILED: $_"
   # never leave NEW with the auto-grant defaults switched off

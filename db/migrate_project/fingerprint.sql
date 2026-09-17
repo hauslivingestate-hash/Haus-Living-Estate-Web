@@ -8,11 +8,18 @@ set extra_float_digits = 3;
 select format($q$select 'DATA|%s.%s|' || count(*) || '|' || md5(coalesce(string_agg(t::text, E'\n' order by t::text), '')) from %I.%I t$q$,
               n.nspname, c.relname, n.nspname, c.relname)
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
-where c.relkind = 'r'
-  and (n.nspname = 'public'
-       or (n.nspname = 'storage' and c.relname in ('buckets', 'objects')))
+where c.relkind = 'r' and n.nspname = 'public'
 order by 1
 \gexec
+
+-- Storage: compare what identifies a file, not the row. Files are re-uploaded through the
+-- storage API rather than copied as rows, so ids, owners and timestamps are new by design.
+select 'BUCKET|' || id || '|public=' || public || '|limit=' || coalesce(file_size_limit::text, '') || '|' || coalesce(array_to_string(allowed_mime_types, ','), '') from storage.buckets order by id;
+select 'STORFILE|' || bucket_id || '/' || name || '|' || coalesce(metadata->>'size', '?') || '|' || coalesce(metadata->>'mimetype', '?') from storage.objects order by bucket_id, name;
+
+-- Migration history: the CLI skips a version it already sees here, so it has to come across
+-- or the next `supabase db push` replays every migration against the new project.
+select 'MIGR|' || count(*) || '|' || coalesce(max(version), '') from supabase_migrations.schema_migrations;
 
 -- auth: compare the columns that matter (ids, emails, password hashes), not bookkeeping timestamps
 select 'AUTHUSER|' || id || '|' || coalesce(email, '') || '|' || md5(coalesce(encrypted_password, '')) || '|' || (email_confirmed_at is not null) || '|' || coalesce(raw_app_meta_data::text, '') from auth.users order by id;
