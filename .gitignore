@@ -9,3 +9,4 @@ import/*
 !import/README.md
 # สคริปต์ import เก็บไว้ — เป็นบันทึกว่าแปลงข้อมูลอะไรบ้างตอนย้ายจากชีท (ไม่มีรหัสผ่านในไฟล์)
 !import/run_import.py
+!import/build_0918.py
