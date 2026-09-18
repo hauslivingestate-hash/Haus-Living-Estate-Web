@@ -18,7 +18,8 @@
 > `full_cutover.ps1` → `NONE - identical` (271 วิ) · `rls_test.sql` ตรงกับฐานเก่าทุกบรรทัด · `compare.ps1` รอบ 2 ก่อน push ก็ยัง identical (ไม่มีใครเขียนระหว่างย้าย) · bundle production มีแต่ ref ใหม่
 > 🔴 **ฐานเก่า `jpufhxzvqfrdcblfmrmu` ห้ามแตะอีก** — migration/ข้อมูลที่ลงฐานเก่าหลังนี้จะหายไปกับฐานที่ไม่มีใครอ่าน · `.mcp.json` ทั้ง 2 ที่ชี้ ref ใหม่แล้ว ต้อง authorize ใหม่ที่ `/mcp` · `SUPABASE_SERVICE_ROLE_KEY` ใน `.env.local` เป็น `sb_secret_` แบบใหม่แล้ว
 > ✅ 2026-09-18: ปิด "Allow new users to sign up" แล้ว (`/auth/v1/settings` → `disable_signup: true`) · production `/login` 200 + bundle มีแต่ ref ใหม่ · `haus-crm/.mcp.json` บน GitHub ชี้ ref ใหม่แล้ว
-> ⬜ ค้าง: Ben login เช็ค production แล้วปล่อยทีม (ณ 09-18 ยังไม่มีใคร login ฐานใหม่เลย — `last_sign_in_at` ทุกคนเป็นค่าก๊อปจากฐานเก่า) · Ben Poovaviranon ต้อง `git pull` + แก้ `.mcp.json` ของตัวเอง · ไม่ได้ตั้ง `OPENAI_API_KEY` (Ben: ไม่เป็นไร) · ลบ `haus-migration.env` + `%TEMP%\haus-migration-dump` หลัง Ben ยืนยัน · เก็บโปรเจกต์เก่าไว้ 1–2 สัปดาห์ · `import/run_import.py` ยังชี้ฐานเก่า (ไม่เร่ง)
+> ✅ 2026-09-18: Ben login production ผ่าน (Benz เข้าฐานใหม่จริง 17:28) · ลบ `haus-migration.env` + `%TEMP%\haus-migration-dump` แล้ว → **รัน `db/migrate_project/*` หรือ psql ตรงอีกต้องสร้างไฟล์ env ใหม่** (ขอรหัส DB จาก Ben)
+> ⬜ ค้าง: บอกทีมกลับมาใช้งาน · Ben Poovaviranon ต้อง `git pull` + แก้ `.mcp.json` ของตัวเอง · ไม่ได้ตั้ง `OPENAI_API_KEY` (Ben: ไม่เป็นไร) · เก็บโปรเจกต์เก่าไว้ 1–2 สัปดาห์ · `import/run_import.py` ยังชี้ฐานเก่า (ไม่เร่ง)
 
 | ด้าน | สถานะ |
 |---|---|
