@@ -40,11 +40,32 @@
 | 5 | **สลับจริง** (`full_cutover.ps1` → แก้โค้ด 6 จุด → push → Ben เช็ค production) | ✅ สลับแล้ว 2026-09-18 (`848c91d`) · ⬜ รอ Ben login เช็ค |
 | 6 | **อัปเดตข้อมูลจากชีทอีกรอบ** (ไฟล์ `import/18-09*.csv`) | ✅ ลงฐานใหม่แล้ว 2026-09-18 — ดู 🔖 2026-09-18 |
 
-**➡️ เซสชันหน้า (Ben 2026-09-18): เริ่มทำ "โซน Support"** — ขอข้อมูลงานประจำวันของ Benz + จุดที่ติดก่อนร่างหน้าจอ
+**✅ 2026-09-19: โต๊ะงาน Support ขึ้น production แล้ว** (haus-crm `2214662`) — ดู 🔖 2026-09-19 · ⬜ ยังไม่ได้ทดสอบด้วยบัญชี Benz/Admin ในเบราว์เซอร์ (มีรหัสแค่ Game)
 
 **✅ แดชบอร์ด `/` เสร็จแล้ว (Ben P. · ตรวจบน production 2026-09-18 ด้วยบัญชี Game)** — แท็บ ขาย (+ ทีม สำหรับคนที่มีสิทธิ์) · รายได้มาจากตาราง **`closed_case`** (53 เคส ลงเมื่อ 09-10 · = ค่าคอม ไม่ใช่ราคาบ้าน · ไม่ได้ใช้ `last_match_price`) · ตัวเลขกิจกรรมตรง DB ทุกตัว · 0 console error · ทีม "ทีมขาย" มีสมาชิก 6 คน **ยังไม่มีหัวหน้า** · ⬜ ยังไม่ได้เปิดแท็บทีมด้วยบัญชี Stone/Admin · ❓ ดีลใหม่หลัง 09-10 เข้า `closed_case` ผ่านเว็บเท่านั้น — ถาม Ben P. ว่าทีมกรอกที่ไหน
 
-**💡 ไอเดียรอคุย (Ben 2026-09-18): "โซน Support"** — Ben อยากแก้ UX/UI ให้ Benz (คนเดียวที่ถือ `listing_support`) โดยไม่กระทบเซล · ถามว่าทำโปรเจกต์ใหม่ใช้ DB เดิมได้ไหม → ได้ แต่แนะนำ **route group `/support/*` ในแอปเดิม** (เมนู/หน้าตาของตัวเอง · หน้าเซลไม่ถูกแตะ · ใช้ mutation + audit_log + ด่านสิทธิ์ที่อยู่ใน `lib/mutations/*` ร่วมกัน) · เหตุผล: ด่านหลายชั้นอยู่ในโค้ดแอป ไม่ใช่ใน DB — แอปแยกต้องเขียนซ้ำ ลืมจุดไหนหลุดเงียบ · **Ben: "น่าสนใจ ค่อยว่ากัน"** ยังไม่เริ่ม ต้องรู้ก่อนว่า Benz ทำงานอะไรแต่ละวัน
+## 🔖 อ่านก่อน (2026-09-19) — โต๊ะงาน Support (`/support/*`) · haus-crm `2214662`
+
+**ทำไมอยู่ในแอปเดิม ไม่แยกแอป (Ben ถาม 2 รอบ)**: ด่านหลายชั้นอยู่ในโค้ดแอป ไม่ใช่ใน DB (กันแก้ราคา/PII รายคอลัมน์ · บังคับ sale_id · กันล็อกสิทธิ์ตัวเอง · audit_log) → แอปแยกต้องเขียนซ้ำทุกข้อ ลืมข้อไหนหลุดเงียบ + schema เปลี่ยนตลอด (99+ migration) · หน้า Support แตะโค้ดกลางแค่ nav / rbac spec / redirect หน้าแรก / export `LISTING_COLUMNS`
+
+**งานของ Benz (Ben 2026-09-19)**: ลงประกาศตามเว็บจากทรัพย์ Ready to Post · อัปเดตประกาศตาม Update/Sold/Cancel · โพสต์ Facebook group + เก็บลิงก์ · กระจายลีด (อยู่ `/assign` เดิม) · **Need Info = งานเซล ไม่ใช่ Support**
+
+| เมนู (กลุ่ม "โต๊ะงาน Support" · สิทธิ์ `support.workspace`) | ทำอะไร |
+|---|---|
+| ลงประกาศใหม่ `/support/new` | Ready to Post · วางลิงก์ **ขั้นต่ำ Livinginsider + PropertyHub** (DDproperty ไม่บังคับ) → Posted · กันวางผิดช่อง · ปุ่มคำโฆษณา |
+| อัปเดตประกาศ `/support/update` | Update/Sold/Cancel · โชว์ old→new price + update_remark · ปิดงาน → Posted / Sold Completed / Cancel Completed |
+| Facebook Post `/support/facebook` | Posted + **Exclusive = potential `Exclusive` ตรงตัวเท่านั้น** (`Exclusive A` / `A List + Fb add` = A-List — Ben สั่ง ต่างจาก `potentialGroup()`) · Exclusive ก่อน · จัดกลุ่มตามเซล · ตารางกาง |
+
+- **Facebook Post คอลัมน์**: A-List = ID · Project · Price · Template Link · Marketplace☐ · Profile☐ · Page☐ · Group 1–5 · โพสต์กลุ่มใหม่ · Exclusive เพิ่ม วันเริ่ม/สิ้นสุดสัญญา (แก้ในตารางได้ = `main_4.agreement_*`) + **วันปักหมุด** (`main_4.fb_pinned_on` Benz กรอก · แดงเมื่อเกิน 85 วัน)
+- **Group 1–5** = ตาราง `listing_fb_group_post` (PK listing+slot) · โพสต์ใหม่ลงช่องว่าง ครบ 5 แล้ว**ทับช่องเก่าสุด** · แก้/ลบลิงก์ได้ (Benz ใส่ลิงก์ Google Sheet ผิดช่องที่ HCYP003 — แก้ได้ด้วย ✎) · แดงเมื่อโพสต์ล่าสุดเกิน 6 วัน · mirror วัน+ลิงก์ล่าสุดลงขั้น "Facebook Group" ของเช็คลิสต์ · ลิงก์ที่ถูกทับอยู่ใน audit_log
+- **Template Link / Marketplace / Profile / Page = ขั้นในเช็คลิสต์ "ลงประกาศ A List" เดิม** (Ben อนุมัติ): แยก "Facebook Profile / เพจ" → Profile + Page · เพิ่ม Template Link · ทุกขั้น Facebook เป็นของ `listing_support` · **บอร์ดหาขั้นด้วย `checklist_template_item.board_key`** (ไม่ใช่ label — CEO เปลี่ยนชื่อในตั้งค่าได้) ⚠️ ถ้าลบขั้นแล้วสร้างใหม่ในตั้งค่า `board_key` จะหาย ต้องใส่คืนด้วย SQL
+- **ตัด "บูสต์โพสต์กลุ่ม" ทิ้งทุกหน้า** (Ben) — มาจาก `group_boost_date` ในชีทที่ไม่เคยมีใครกรอก · DD Boost / LV Boost ของทรัพย์ **คนละเรื่อง ไม่ได้แตะ**
+- **Benz login แล้วเข้า `/support` แทนแดชบอร์ด** (มี `support.workspace` แต่ไม่มี `listings.create`) · ตัวเลขบนเมนูใช้กฎเดียวกับหน้า (`getSupportCounts`)
+- **`main_9_support_log.support_id` บันทึกคนเปลี่ยนสถานะแล้ว** (trigger ใช้ `current_employee_code()` · import/service = null) — เดิม null ทุกแถว
+- **พับหัวข้อในแถบด้านข้างได้ ต่อคน** (Ben เลือกแบบ ก.) → `table_prefs` table_key `sidebar` · หัวข้อที่พับโชว์ผลรวมตัวเลข · เปิดหน้าในหัวข้อที่พับจะกางชั่วคราว · 🐛 เจอแล้วแก้: เรียก server action ใน setState updater → "Cannot update a component (Router) while rendering Sidebar"
+- ⚠️ **คิว ลงประกาศใหม่/อัปเดตประกาศ จะว่างจนกว่าเซลเปลี่ยนสถานะในเว็บ** (ตอนนี้ยังทำในชีท) · ก่อนหน้านั้นเจอ 4 รายการหลอกจากสถานะค้าง → นำไปสู่การ sync สถานะทรัพย์ 62 + ลีด 189 (ดู 🔖 2026-09-18)
+- Migrations: `20260919100136_support_workspace` · `20260919105444_support_facebook_board` · `20260919110359_drop_fb_boost_step` (ไฟล์อยู่ `haus-crm/supabase/migrations/`)
+- **ทดสอบแล้ว**: build ผ่าน · typecheck ผ่าน · Game (เซล) ไม่เห็นเมนู/ถูกส่งกลับ · พับเมนูผ่านครบ · **⬜ ยังไม่ได้กดจริงด้วยบัญชี Benz/Admin** · Facebook Post เริ่มต้น 138 ทรัพย์ (Exclusive 6 · A-List 132) ขึ้น "ยังไม่เคยโพสต์" ทั้งหมด — ถ้ามีวันโพสต์ล่าสุดในชีทค่อย import
 
 **ข้อ 6 — อ่านก่อนเริ่ม import รอบหน้า** (บทเรียนจากรอบ 2026-08-26 ซึ่งอยู่ในหัวข้อ 🔖 ของมันเอง):
 - 🔴 **`Project ID` ในชีทไม่นิ่ง** เป็นสูตรอิงตำแหน่งแถว → **จับคู่โครงการด้วย `project_name_thai` เท่านั้น** ห้าม insert ทับด้วยเลขจากชีท (Listing ID / Lead ID นิ่ง ใช้ได้)
